@@ -19,8 +19,8 @@ Nothing. Phase 0 is complete except for the two items under **Blocked** below.
 | 0.1 | Monorepo scaffold | `npm run typecheck` passes across all workspaces | **Met** |
 | 0.2 | Expo app shell | Boots on the iOS Simulator; tab bar matches the spec | **Partial** — see Blocked |
 | 0.3 | API skeleton | Layering enforced by structure; a repository method cannot be written without a `user_id` | **Met** |
-| 0.4 | Database foundation | `db:migrate && db:seed --set=minimal` works from a clean checkout | **Unverified** — see Blocked |
-| 0.5 | Authentication | Sign-in works on a device and `GET /auth/me` returns the user | **Partial** — see Blocked |
+| 0.4 | Database foundation | `db:migrate && db:seed --set=minimal` works from a clean checkout | **Met** — verified against a real Postgres |
+| 0.5 | Authentication | Sign-in works on a device and `GET /auth/me` returns the user | **Partial** — verified at the HTTP layer; not on a device (B-2) |
 | 0.6 | `packages/taxonomy` | A test asserting an invalid category fails to typecheck | **Met** |
 | 0.7 | `packages/ui` tokens | A lint rule rejects literal hex in feature code | **Met** |
 | 0.8 | Environments | Runs end to end locally with no real provider credentials | **Met** |
@@ -29,31 +29,24 @@ Nothing. Phase 0 is complete except for the two items under **Blocked** below.
 
 ## Blocked
 
-### B-1 — Docker daemon unavailable on this machine
+### ~~B-1 — Docker daemon unavailable~~ — CLEARED 2026-09-03
 
-`docker compose up` never completes: Docker Desktop launches, `docker ps`
-answers, but image pulls and `docker version` hang indefinitely. The registry is
-reachable (`registry-1.docker.io` returns 401 as expected), so this is a local
-Docker Desktop problem, not a network one.
+Docker Desktop eventually finished warming up. Everything that was unverified
+has now run against a real Postgres 16 + pgvector:
 
-**Consequence.** These are written and typechecked but have never executed:
+- migration `0001_foundation.sql` applied (and is idempotent: a second run
+  applies 0)
+- `npm run db:seed -- --set=minimal` seeded 1 user + 1 closet (and is
+  idempotent: a second run creates 0)
+- all 10 database integration tests executed — confirmed by the absence of skip
+  warnings and by real round-trip timings
 
-- migration `0001_foundation.sql` against a real Postgres
-- `npm run db:seed -- --set=minimal`
-- `apps/api/src/db/integration.test.ts` — including the cross-user 404 test,
-  which is the one security test that needs a real database
+**The cross-user 404 test was verified load-bearing**, not merely passing: with
+a deliberate IDOR bug injected into `findClosetById` (`where id = $2 or
+user_id = $1`), the test fails; restored, it passes.
 
-The integration tests skip with a warning when no database is reachable, so the
-suite is green — but green does not mean those assertions ran.
-
-**To unblock:** open Docker Desktop and complete its first-run setup, then:
-
-```bash
-npm run db:up && npm run db:migrate && npm run db:seed -- --set=minimal && npm test
-```
-
-CI runs Postgres as a service container, so these tests will execute there
-regardless.
+Three real bugs surfaced only by running this, none of which typechecking could
+have caught — see `tasks/completed.md`.
 
 ### B-2 — No iOS Simulator on this machine
 
@@ -69,9 +62,26 @@ then `npm run mobile` and press `i`.
 
 ## Next
 
-Phase 1 — Closet core (`docs/08-engineering/implementation-plan.md`). Do not
-start it until B-1 and B-2 are cleared: Phase 1 is the garment schema and the
-closet grid, and neither can be verified without a database and a simulator.
+Phase 1 — Closet core (`docs/08-engineering/implementation-plan.md`).
+
+The database half of Phase 1 (garment schema, storage, garments CRUD) is now
+unblocked and can start. The closet grid and garment detail cannot be signed off
+until B-2 is cleared, because `AGENTS.md` requires visual verification in the
+iOS Simulator.
+
+## Local setup
+
+```bash
+npm install
+npm run db:up          # Postgres on 5433, Redis on 6380
+npm run db:migrate
+npm run db:seed -- --set=minimal
+npm run verify
+```
+
+Ports are 5433 and 6380, not the defaults: this machine already runs a native
+Postgres and Redis on 5432/6379, and Mira must never compete with a developer's
+own services.
 
 ## Notes
 

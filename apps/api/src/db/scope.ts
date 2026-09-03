@@ -71,21 +71,55 @@ export const USER_OWNED_TABLES = [
 export type UserOwnedTable = (typeof USER_OWNED_TABLES)[number];
 
 const TABLE_RE = new RegExp(
-  `\\b(?:from|join|into|update)\\s+"?(${USER_OWNED_TABLES.join('|')})"?\\b`,
+  `\\b(from|join|into|update)\\s+"?(${USER_OWNED_TABLES.join('|')})"?\\b`,
   'gi',
 );
 const USER_ID_PREDICATE_RE = /\buser_id\s*=\s*\$\d+/i;
+const INSERT_TARGET_RE = new RegExp(
+  `\\binsert\\s+into\\s+"?(${USER_OWNED_TABLES.join('|')})"?\\s*\\(([^)]*)\\)`,
+  'i',
+);
 
 /**
- * Statements that reference a user-owned table but do not filter on user_id.
+ * Statements that reference a user-owned table without scoping to a user.
  * Returns the offending table names.
+ *
+ * Two different things count as "scoped", because reads and writes scope
+ * differently:
+ *
+ *   SELECT / UPDATE / DELETE  filter on the user: `... where user_id = $1`
+ *   INSERT                    SUPPLY the user: `insert into t (user_id, ...)`
+ *
+ * An INSERT has no WHERE clause to filter on, so requiring a predicate there
+ * would reject every correct write. What it must do instead is name `user_id`
+ * among its columns, so a row cannot be created without an owner.
  */
 export function unscopedTables(sql: string): string[] {
   const withoutComments = sql.replace(/--[^\n]*/g, ' ');
-  const tables = [...withoutComments.matchAll(TABLE_RE)].map((m) => (m[1] ?? '').toLowerCase());
-  if (tables.length === 0) return [];
-  if (USER_ID_PREDICATE_RE.test(withoutComments)) return [];
-  return [...new Set(tables)];
+  const hasUserPredicate = USER_ID_PREDICATE_RE.test(withoutComments);
+
+  const insertMatch = INSERT_TARGET_RE.exec(withoutComments);
+  const insertTarget = insertMatch?.[1]?.toLowerCase() ?? null;
+  const insertNamesUserId = /\buser_id\b/i.test(insertMatch?.[2] ?? '');
+
+  const offenders = new Set<string>();
+
+  for (const match of withoutComments.matchAll(TABLE_RE)) {
+    const clause = (match[1] ?? '').toLowerCase();
+    const table = (match[2] ?? '').toLowerCase();
+
+    // The INSERT target scopes by naming user_id among its columns.
+    if (clause === 'into' && table === insertTarget) {
+      if (!insertNamesUserId) offenders.add(table);
+      continue;
+    }
+
+    // Everything else — including the SELECT side of an INSERT ... SELECT —
+    // must filter on the user.
+    if (!hasUserPredicate) offenders.add(table);
+  }
+
+  return [...offenders];
 }
 
 export class UnscopedQueryError extends Error {

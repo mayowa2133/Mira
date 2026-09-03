@@ -99,3 +99,21 @@ Format: `## YYYY-MM-DD` then bullets grouped by area.
 
 - D-015 — moderate transitive advisories under `expo-router` are accepted; the
   CI audit gate is `high`.
+
+### Engineering (Phase 0, continued)
+
+- Local Postgres and Redis moved to host ports **5433** and **6380**. A
+  developer machine frequently already runs these on 5432/6379, and binding the
+  defaults either fails or silently shadows theirs. Mira never competes with a
+  developer's own services.
+- `db:migrate`, `db:seed` and `dev` build before running. Node's
+  `--experimental-strip-types` strips types but does not rewrite the `.js`
+  import specifiers NodeNext requires, so running the `.ts` entrypoints
+  directly cannot resolve their imports.
+- SQL migrations are resolved from the package root, not from the calling
+  module: they are source, not build output, and `tsc` does not copy them.
+- The `scopedQuery` guard now distinguishes reads from writes.
+  SELECT/UPDATE/DELETE must filter on `user_id`; an INSERT must name `user_id`
+  among its columns, because it has no WHERE clause to filter on. It still
+  rejects an ownerless INSERT and still requires a predicate on the SELECT side
+  of an `INSERT ... SELECT`.

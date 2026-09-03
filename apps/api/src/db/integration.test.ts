@@ -16,7 +16,7 @@ import { IdentityRepository } from '../modules/identity/repository.js';
 import { UnscopedQueryError, scopedQuery, userScope } from './scope.js';
 import { loadMigrations } from './migrate.js';
 
-const DATABASE_URL = process.env['DATABASE_URL'] ?? 'postgresql://mira:mira@localhost:5432/mira';
+const DATABASE_URL = process.env['DATABASE_URL'] ?? 'postgresql://mira:mira@localhost:5433/mira';
 
 let pool: pg.Pool | null = null;
 let available = false;

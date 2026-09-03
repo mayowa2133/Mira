@@ -35,8 +35,33 @@ describe('unscopedTables', () => {
     expect(unscopedTables('update outfits set name = $1 where id = $2')).toEqual(['outfits']);
   });
 
-  it('flags an insert into a user-owned table', () => {
-    expect(unscopedTables('insert into wear_events (id) values ($1)')).toEqual(['wear_events']);
+  // An INSERT has no WHERE clause to filter on, so it scopes differently: it
+  // must NAME user_id among its columns, so a row cannot be created ownerless.
+  it('flags an insert that does not name user_id', () => {
+    expect(unscopedTables('insert into wear_events (id, worn_on) values ($1, $2)')).toEqual([
+      'wear_events',
+    ]);
+  });
+
+  it('accepts an insert that names user_id among its columns', () => {
+    expect(
+      unscopedTables('insert into wear_events (user_id, garment_id, worn_on) values ($1, $2, $3)'),
+    ).toEqual([]);
+  });
+
+  it('accepts an upsert that names user_id, including its on-conflict clause', () => {
+    const sql = `insert into closets (user_id, name, is_default)
+                 values ($1, 'My closet', true)
+                 on conflict (user_id) where is_default
+                 do update set name = closets.name
+                 returning id, user_id, name, is_default`;
+    expect(unscopedTables(sql)).toEqual([]);
+  });
+
+  it('still requires a predicate on the SELECT side of an insert...select', () => {
+    expect(
+      unscopedTables('insert into outfit_items (user_id, garment_id) select $1, id from garments'),
+    ).toEqual(['garments']);
   });
 
   it('flags a join onto a user-owned table', () => {

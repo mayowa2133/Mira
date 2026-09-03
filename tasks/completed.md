@@ -71,14 +71,49 @@ npm workspaces monorepo on Node 22, TypeScript strict throughout.
    prose containing deliberate ASCII wireframes), and the parser now tolerates
    the blank line.
 
+**Three bugs found by running against a real database** — none catchable by
+typechecking, all found the first time the migration actually executed:
+
+1. **`--experimental-strip-types` cannot run the CLI scripts.** Node strips
+   types but does not rewrite the `.js` import specifiers that NodeNext
+   requires, so `migrate.ts` failed to resolve `pool.js`. The `db:migrate`,
+   `db:seed` and `dev` scripts now build first and run the compiled output.
+2. **`tsc` does not copy `.sql` files.** The migration runner resolved
+   `migrations/` relative to its own module, which exists in `src/` but not in
+   `dist/`. Migrations are source, not build output, so they are now resolved
+   from the package root and read from `src/` in both cases.
+3. **The scope guard rejected every INSERT.** `unscopedTables` required a
+   `user_id = $n` predicate, which an INSERT legitimately cannot have. Reads and
+   writes scope differently: SELECT/UPDATE/DELETE must *filter* on the user,
+   while an INSERT must *name* `user_id` among its columns so a row cannot be
+   created ownerless. The guard now distinguishes the two, still rejects an
+   INSERT that omits `user_id`, and still requires a predicate on the SELECT
+   side of an `INSERT ... SELECT`. Four tests pin the distinction.
+
+**Port collision avoided.** This machine already runs a native Postgres and
+Redis on 5432/6379, so `localhost` resolved to those rather than the containers
+(`role "mira" does not exist`). Mira's containers moved to 5433 and 6380 rather
+than competing with a developer's own services.
+
+**Verification that the security tests are load-bearing.** Both were confirmed
+by breaking them deliberately, not by observing them pass:
+
+- Taxonomy widening: removing a `@ts-expect-error` fails the build; adding an
+  unnecessary one also fails it.
+- Cross-user access: injecting a classic IDOR (`where id = $2 or user_id = $1`)
+  into `findClosetById` makes the test fail; restored, it passes.
+
 **Decisions recorded:** D-015 (moderate transitive advisories under
 `expo-router` are accepted; CI gates at high).
 
-**Not verified — see `tasks/current.md` Blocked.** The Docker daemon on this
-machine never became usable, so the migration, the seed and the database
-integration tests have never executed. No full Xcode, so the Expo app has never
-been rendered in a simulator. Both are environment problems, and both are
-recorded rather than papered over.
+**Verified end to end:** 207 tests across 10 files, including all 10 database
+integration tests against a real Postgres 16 + pgvector. Migration and seed are
+both idempotent.
+
+**Still not verified.** No full Xcode on this machine, so the Expo app has never
+been rendered in a simulator. `AGENTS.md` requires visual verification, so task
+0.2 is not done by Mira's own standard. Recorded in `tasks/current.md` as B-2
+rather than papered over.
 
 ---
 

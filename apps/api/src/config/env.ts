@@ -19,7 +19,7 @@ const EnvSchema = z.object({
   API_HOST: z.string().default('0.0.0.0'),
   API_CORS_ORIGINS: z.string().default(''),
 
-  DATABASE_URL: z.string().default('postgresql://mira:mira@localhost:5432/mira'),
+  DATABASE_URL: z.string().default('postgresql://mira:mira@localhost:5433/mira'),
   DATABASE_POOL_MAX: z.coerce.number().int().positive().default(10),
 
   // Auth. JWKS is required in every environment except local, where a dev
@@ -38,7 +38,7 @@ const EnvSchema = z.object({
   AI_TRYON_PROVIDER: z.string().default('stub'),
   AI_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
 
-  REDIS_URL: z.string().default('redis://localhost:6379'),
+  REDIS_URL: z.string().default('redis://localhost:6380'),
 
   SENTRY_DSN: z.string().optional(),
   POSTHOG_API_KEY: z.string().optional(),

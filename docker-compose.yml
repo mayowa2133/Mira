@@ -8,8 +8,11 @@ services:
       POSTGRES_USER: mira
       POSTGRES_PASSWORD: mira
       POSTGRES_DB: mira
+    # Host port 5433, not 5432: a developer machine frequently already runs a
+    # native Postgres on 5432, and binding it would either fail or silently
+    # shadow theirs. Mira never competes with a developer's own services.
     ports:
-      - '5432:5432'
+      - '5433:5432'
     volumes:
       - mira-pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -21,8 +24,9 @@ services:
   redis:
     image: redis:7-alpine
     container_name: mira-redis
+    # Host port 6380, for the same reason as Postgres above.
     ports:
-      - '6379:6379'
+      - '6380:6379'
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 5s

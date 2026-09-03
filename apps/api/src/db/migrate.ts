@@ -11,14 +11,16 @@
  */
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { getPool, closePool } from './pool.js';
 import { createLogger } from '../lib/logger.js';
 import { isEntrypoint } from '../lib/entrypoint.js';
+import { packageRoot } from '../lib/package-root.js';
 import { env } from '../config/env.js';
 
-const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), 'migrations');
+// SQL migrations are source, not build output: `tsc` does not copy them, so
+// they are always read from `src/`, whether running from src or dist.
+const MIGRATIONS_DIR = join(packageRoot(import.meta.url), 'src/db/migrations');
 
 type Migration = { name: string; sql: string; checksum: string };
 
