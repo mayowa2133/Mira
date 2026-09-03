@@ -67,9 +67,27 @@ export type ClosetGridProps = {
   onClearFilters: () => void;
   onAddFirst: () => void;
   header?: React.ReactElement;
+  /**
+   * Captures that exist on the device but not yet on the server (task 2.6).
+   *
+   * Rendered ABOVE the fetched garments and outside the list, so a photo
+   * taken thirty seconds ago is where the user expects it — at the top —
+   * without pretending to be a paged result it would then fight with.
+   */
+  pending?: React.ReactElement | null;
 };
 
 export function ClosetGrid(props: ClosetGridProps) {
+  // Pending captures ride with the header so they appear in every state — a
+  // photo taken while offline must be visible on the error screen too, which is
+  // exactly when the user most needs to know it was not lost.
+  const header = (
+    <>
+      {props.header}
+      {props.pending}
+    </>
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: Garment }) => (
       <View style={styles.cell}>
@@ -93,7 +111,7 @@ export function ClosetGrid(props: ClosetGridProps) {
     // only shows when there is nothing cached to show (REL-1).
     return (
       <ScrollView contentContainerStyle={styles.scroll}>
-        {props.header}
+        {header}
         <ClosetState
           message={apiError?.isOffline ? "You're offline." : "We couldn't load your closet."}
           hint={
@@ -112,17 +130,19 @@ export function ClosetGrid(props: ClosetGridProps) {
   if (props.isLoading && props.garments.length === 0) {
     return (
       <ScrollView contentContainerStyle={styles.scroll}>
-        {props.header}
+        {header}
         <ClosetGridSkeleton />
       </ScrollView>
     );
   }
 
   // --- empty ---------------------------------------------------------------
-  if (props.garments.length === 0) {
+  // "You have nothing" is a lie if a capture is queued: the user just took a
+  // photo, and it is rendered in the header above.
+  if (props.garments.length === 0 && !props.pending) {
     return (
       <ScrollView contentContainerStyle={styles.scroll}>
-        {props.header}
+        {header}
         {props.hasFilters ? (
           <ClosetState
             message="No pieces match those filters."
@@ -148,7 +168,7 @@ export function ClosetGrid(props: ClosetGridProps) {
       renderItem={renderItem}
       keyExtractor={keyExtractor}
       numColumns={COLUMNS}
-      ListHeaderComponent={props.header}
+      ListHeaderComponent={header}
       contentContainerStyle={styles.listContent}
       onEndReached={props.onEndReached}
       onEndReachedThreshold={0.6}

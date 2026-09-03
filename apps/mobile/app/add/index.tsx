@@ -9,15 +9,14 @@ import { color, radius, space, type } from '@mira/ui';
  * The camera method gets the strongest hierarchy; manual entry is always last
  * (`docs/01-product/feature-specs.md` — F-01, and the Add item menu wireframe).
  *
- * Phase 1 renders the menu. The flows behind it land in their own phases:
- * camera in Phase 2, tag and receipt in Phase 4, email in Phase 8. Options that
- * cannot work yet say so rather than dead-ending.
+ * Camera and photo library work as of Phase 2; tag and receipt land in Phase
+ * 4, email in Phase 8. Options that cannot work yet say so rather than
+ * dead-ending.
  */
 const OPTIONS = [
   { icon: '🏷', label: 'Scan a tag', phase: 'Phase 4' },
   { icon: '🧾', label: 'Scan a receipt', phase: 'Phase 4' },
   { icon: '✉️', label: 'Find online purchases', phase: 'Phase 8' },
-  { icon: '🖼', label: 'Choose a photo', phase: 'Phase 2' },
   { icon: '🔗', label: 'Paste product link', phase: 'Phase 3' },
 ];
 
@@ -34,12 +33,29 @@ export default function AddScreen() {
         Add to your closet
       </Text>
 
-      <View style={styles.primary}>
+      <Pressable
+        style={styles.primary}
+        onPress={() => router.push('/add/scan')}
+        accessibilityRole="button"
+        accessibilityLabel="Scan an item. Photograph something you already own."
+      >
         <Text style={styles.primaryIcon}>📸</Text>
         <Text style={styles.primaryLabel}>Scan an item</Text>
         <Text style={styles.primaryHint}>Photograph something you already own</Text>
-        <Text style={styles.pending}>Camera capture arrives in Phase 2</Text>
-      </View>
+      </Pressable>
+
+      {/* The library route is the same screen: it opens the picker directly,
+          so "choose a photo" never means "first grant camera access". */}
+      <Pressable
+        style={styles.row}
+        onPress={() => router.push('/add/scan?source=library')}
+        accessibilityRole="button"
+        accessibilityLabel="Choose a photo"
+      >
+        <Text style={styles.rowIcon}>🖼</Text>
+        <Text style={styles.rowLabel}>Choose a photo</Text>
+        <Text style={styles.rowChevron}>›</Text>
+      </Pressable>
 
       {OPTIONS.map((option) => (
         <View key={option.label} style={styles.row}>

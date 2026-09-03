@@ -48,6 +48,31 @@ export const color = {
 
   inverseBg: '#171717',
   inverseText: '#FFFFFF',
+
+  /**
+   * Camera surfaces.
+   *
+   * A live viewfinder is not a Mira surface — it is whatever the user is
+   * pointing at — so the warm light palette has nothing to say about it. These
+   * are the only colours allowed over video, and they are deliberately few:
+   * screen-specs.md §9 is a list of what the camera must NOT have.
+   *
+   * They do not invert in dark mode. The camera is already dark.
+   */
+  cameraBg: '#000000',
+  cameraChrome: 'rgba(255,255,255,0.90)',
+  /** The silhouette guide: present enough to aim by, quiet enough to ignore. */
+  cameraGuide: 'rgba(255,255,255,0.55)',
+  cameraScrim: 'rgba(0,0,0,0.66)',
+
+  /**
+   * Laid over a local photo that is still uploading (task 2.6).
+   *
+   * The photograph stays legible through it: the tile's job is to reassure the
+   * user their picture exists, so veiling it into abstraction would defeat it.
+   */
+  pendingVeil: 'rgba(250,249,247,0.45)',
+  pendingVeilFailed: 'rgba(250,249,247,0.66)',
 } as const;
 
 /**

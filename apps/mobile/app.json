@@ -37,6 +37,18 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Mira uses your camera to scan the clothes you already own."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Mira uses your photos to add clothes you already own."
+        }
+      ],
       "./plugins/withUITestTarget"
     ]
   }

@@ -8,6 +8,7 @@ import { ApiError } from '@/lib/api';
 import { SnackbarProvider } from '@/ui/Snackbar';
 import { bootstrapDevAuth } from '@/lib/dev-auth';
 import { useDevInitialRoute } from '@/lib/dev-route';
+import { useUploadQueue } from '@/features/capture/queue';
 
 // Development-only: real sign-in is task 0.5 and has no client yet. Inert in
 // any release build. See src/lib/dev-auth.ts.
@@ -48,6 +49,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <SnackbarProvider>
           <DevRoute />
+          <UploadQueue />
           <StatusBar style="dark" />
           <Stack
             screenOptions={{
@@ -58,12 +60,30 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="garment/[id]" />
             <Stack.Screen name="add/manual" options={{ presentation: 'modal' }} />
+            {/* Full-screen: the camera has no nav bar and no tab bar
+                (docs/02-design/screen-specs.md §9). */}
+            <Stack.Screen
+              name="add/scan"
+              options={{ presentation: 'fullScreenModal', animation: 'fade' }}
+            />
             <Stack.Screen name="edit/[id]" options={{ presentation: 'modal' }} />
           </Stack>
         </SnackbarProvider>
       </SafeAreaProvider>
     </QueryClientProvider>
   );
+}
+
+/**
+ * Drives the capture upload queue for the life of the app.
+ *
+ * Mounted at the root rather than on the closet, because an upload must keep
+ * going while the user is anywhere else — and must resume on foreground even if
+ * the closet was never opened.
+ */
+function UploadQueue() {
+  useUploadQueue();
+  return null;
 }
 
 /** Development-only: see src/lib/dev-route.ts. Renders nothing. */

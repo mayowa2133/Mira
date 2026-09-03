@@ -15,6 +15,12 @@ import {
   type FilterState,
 } from '@/features/closet/filter-state';
 import { useClosetSummary, useGarments, useToggleFavorite } from '@/features/closet/queries';
+import { PendingTile } from '@/features/capture/PendingTile';
+import {
+  discardFailedCapture,
+  retryCapture,
+  usePendingCaptures,
+} from '@/features/capture/queue';
 
 /**
  * Closet (`docs/02-design/screen-specs.md` §14).
@@ -45,6 +51,25 @@ export default function ClosetScreen() {
   );
 
   const chips = useMemo(() => appliedChips(filters), [filters]);
+
+  // Captures still on their way up. They belong at the top of the closet: the
+  // user took that photo seconds ago and expects to see it (task 2.6).
+  const captures = usePendingCaptures();
+
+  const pending =
+    captures.length > 0 ? (
+      <View style={styles.pendingRow}>
+        {captures.map((entry) => (
+          <View key={entry.id} style={styles.pendingCell}>
+            <PendingTile
+              entry={entry}
+              onRetry={retryCapture}
+              onDiscard={discardFailedCapture}
+            />
+          </View>
+        ))}
+      </View>
+    ) : null;
 
   /** The category chip row reflects a single selected category, if exactly one. */
   const selectedCategory = filters.category.length === 1 ? (filters.category[0] ?? null) : null;
@@ -157,6 +182,7 @@ export default function ClosetScreen() {
         onClearFilters={handleClearFilters}
         onAddFirst={handleAdd}
         header={header}
+        pending={pending}
       />
 
       <FilterSheet
@@ -172,6 +198,10 @@ export default function ClosetScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg },
   header: { paddingTop: space.lg, paddingBottom: space.sm },
+  // Matches the grid's two columns, so a pending capture sits exactly where
+  // the finished garment will appear.
+  pendingRow: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -space.xs },
+  pendingCell: { width: '50%', paddingHorizontal: space.xs, paddingBottom: space.lg },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   title: {
     fontSize: type.title1.fontSize,

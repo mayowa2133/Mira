@@ -78,6 +78,33 @@ Warm, brief, second person, lowercase-friendly. "You haven't worn this in
    brand colours.
 5. Every colour that carries meaning also carries text or an icon (A11Y-4).
 
+### Camera and pending surfaces
+
+The viewfinder is the one surface the warm light palette has nothing to say
+about: it shows whatever the user is pointing at, not a Mira background. These
+are the only colours permitted over live video, and the set is deliberately
+small — screen-specs.md §9 is mostly a list of what the camera must NOT have.
+
+| Token | Value | Used for |
+| ----- | ----- | -------- |
+| `cameraBg` | `#000000` | Behind the viewfinder |
+| `cameraChrome` | `rgba(255,255,255,0.90)` | Shutter ring, hint, `Upload instead` |
+| `cameraGuide` | `rgba(255,255,255,0.55)` | The silhouette guide |
+| `cameraScrim` | `rgba(0,0,0,0.66)` | The `Got it.` confirmation |
+
+These do not invert in dark mode. The camera is already dark.
+
+A capture that is uploading is shown from its local file under a veil, so the
+user sees their photograph rather than a progress indicator:
+
+| Token | Value | Used for |
+| ----- | ----- | -------- |
+| `pendingVeil` | `rgba(250,249,247,0.45)` | An uploading capture |
+| `pendingVeilFailed` | `rgba(250,249,247,0.66)` | A capture that needs a retry |
+
+The veil is deliberately light. The tile's job is to reassure the user their
+photo exists; veiling it into abstraction would defeat that.
+
 ### Dark mode
 
 V1 ships light only. The token set is authored so dark mode is a token swap:
