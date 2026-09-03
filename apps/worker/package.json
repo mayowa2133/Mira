@@ -14,8 +14,10 @@
   "dependencies": {
     "@mira/ai": "*",
     "@mira/imaging": "*",
+    "@mira/storage": "*",
     "@mira/taxonomy": "*",
     "@mira/types": "*",
+    "pg": "^8.13.1",
     "sharp": "^0.35.4"
   }
 }

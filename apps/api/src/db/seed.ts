@@ -23,7 +23,7 @@ import {
 import { categoryRowId } from './sync-taxonomy.js';
 import { encodeBlurhash } from '@mira/imaging';
 import { imageHash, renderGarmentImage } from './seed-images.js';
-import { buildStorageKey, createLocalStorage } from '../lib/storage.js';
+import { buildStorageKey, createLocalStorage } from '@mira/storage';
 import { resolveStorageRoot } from '../lib/storage-root.js';
 import { COLOR_SWATCHES, type Color } from '@mira/taxonomy';
 import { createLogger } from '../lib/logger.js';

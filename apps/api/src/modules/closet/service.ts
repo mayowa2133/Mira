@@ -14,7 +14,7 @@ import {
 } from '@mira/taxonomy';
 import type { UserScope } from '../../db/scope.js';
 import { ApiError, ErrorCode, notFound, validationFailed } from '../../http/errors.js';
-import type { StorageDriver } from '../../lib/storage.js';
+import type { StorageDriver } from '@mira/storage';
 import {
   GarmentRepository,
   subcategoryFromRowId,

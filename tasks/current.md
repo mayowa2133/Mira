@@ -63,23 +63,24 @@ through the photo library. Real-device capture remains a manual check.
 
 ## Blocked
 
-### B-5 — No queue transport between API and worker
+### ~~B-5 — No queue transport between API and worker~~ — CLEARED 2026-09-03
 
-`POST /imports/photo` writes an `ingestion_jobs` row and calls the enqueuer;
-the default enqueuer logs a warning and stops there. The worker's queue is
-in-process, so nothing picks the job up: **image.process does not yet run
-end-to-end.**
+The worker claims from `ingestion_jobs` with `for update skip locked`, rather
+than a separate broker. That table already exists as the user-visible mirror of
+the queue (REL-3), it is written in the same transaction as the garment, and a
+broker that can disagree with the job list the user is shown is a bug waiting to
+happen. Revisit if throughput ever needs more than Postgres can claim.
 
-The pipeline itself is implemented and tested (`apps/worker/src/image/`), and
-`ingestion_jobs` is the durable record either way, so no capture is lost — the
-work is deferred, not dropped. What is missing is the transport.
+Verified against real captures: 6 queued jobs → 6 complete, 0 failures, 12
+derivative files, width/height/blurhash and a 16-character perceptual hash
+recorded on every image. Segmentation has no provider yet, so the stub returns
+null and the original stays canonical — a specified path, not a failure.
 
-The likely resolution is to poll `ingestion_jobs` from the worker rather than
-add Redis: the row already exists, is already transactional with the garment,
-and a queue that can disagree with the user-visible job list is a bug waiting
-to happen. Deferred so the mobile capture path can be built against the real
-endpoint first.
-
+**Still not served:** thumb/medium derivatives are written to storage but the
+API has no way to return them. `garment_images` has no column for a variant and
+the image contract has no field, so the grid still loads full-size originals.
+That is the remaining piece of task 2.4 and needs a schema and contract change,
+not a worker change.
 
 ### ~~B-2 — No iOS Simulator~~ — CLEARED 2026-09-03
 

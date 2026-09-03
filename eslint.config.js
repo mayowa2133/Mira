@@ -48,7 +48,14 @@ export default tseslint.config(
       parserOptions: {
         projectService: {
           // Config files live outside every tsconfig `include`.
+          //
+          // The default cap is 8, which one more workspace package quietly
+          // exceeds — and it fails as a PARSING error, which reads like broken
+          // TypeScript rather than a lint setting. Raised deliberately: these
+          // are a handful of small config files, and the cost is a slower lint,
+          // not a weaker one.
           allowDefaultProject: ['*.config.ts', '*/*.config.ts', '*/*/*.config.ts'],
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 24,
         },
         tsconfigRootDir: import.meta.dirname,
       },

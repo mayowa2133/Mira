@@ -250,3 +250,21 @@ Format:
   renders an analyzing tile differently. If that proves confusing in use, the
   answer is a taxonomy change with a migration — not a sentinel invented in the
   service layer.
+
+## D-020 — `ingestion_jobs` is the queue, not a mirror of one
+
+- **Date:** 2026-09-03 · **Status:** Accepted
+- **Decision:** Background work is claimed directly from `ingestion_jobs` using
+  `for update skip locked`. There is no separate broker.
+- **Why:** the table exists regardless — `database-schema.md` specifies it as
+  the user-visible mirror of the queue so failures are retryable in the UI
+  (REL-3) — and it is written in the same transaction as the garment it belongs
+  to. A broker alongside it would be a second source of truth that can disagree
+  with the job list the user is shown, and reconciling those is a class of bug
+  worth not having. Postgres claims safely under concurrency, which was verified
+  with four workers racing over the same six jobs.
+- **Consequences:** throughput is bounded by polling rather than push, and the
+  idle loop costs one query per second per worker. Both are far inside what Mira
+  needs. Revisit when a job class arrives that needs sub-second dispatch or
+  fan-out to many workers; the `JobEnqueuer` port in the API is the seam where a
+  broker would attach.

@@ -25,7 +25,7 @@ import { ClosetService } from '../modules/closet/service.js';
 import { GarmentRepository } from '../modules/closet/repository.js';
 import { IdentityRepository } from '../modules/identity/repository.js';
 import { getPool } from '../db/pool.js';
-import { createLocalStorage, type StorageDriver } from '../lib/storage.js';
+import { createLocalStorage, type StorageDriver } from '@mira/storage';
 import { resolveStorageRoot } from '../lib/storage-root.js';
 
 /**
@@ -49,27 +49,29 @@ export type BuildServerOptions = {
   /**
    * Where background work is handed off.
    *
-   * Defaults to recording the hand-off and nothing more. `ingestion_jobs` is
-   * the durable record either way — that row is what makes a failure visible
-   * and retryable (REL-3) — but until a shared transport exists, no worker
-   * process picks the job up. See tasks/current.md.
+   * Injected for tests. In production the hand-off is the `ingestion_jobs` row
+   * itself — see `tableQueue` below.
    */
   queue?: JobEnqueuer;
 };
 
 /**
- * The default enqueuer: durable record, no transport.
+ * The queue IS the table.
  *
- * Deliberately loud rather than silent. A no-op that logged nothing would make
- * an unprocessed queue look exactly like a working one.
+ * `POST /imports/photo` writes an `ingestion_jobs` row in the same transaction
+ * as the garment, and the worker claims from that table with `for update skip
+ * locked`. So by the time this runs the job is already durably queued, and
+ * there is nothing further to dispatch.
+ *
+ * That is a deliberate choice over a separate broker: `ingestion_jobs` exists
+ * regardless as the user-visible mirror of the queue (REL-3), and a broker that
+ * can disagree with the job list the user is shown is a bug waiting to happen.
+ * Revisit when throughput needs more than Postgres can claim.
  */
-function recordOnlyQueue(logger: Logger): JobEnqueuer {
+function tableQueue(logger: Logger): JobEnqueuer {
   return {
     async enqueue(job) {
-      logger.warn('job recorded but not dispatched — no queue transport configured', {
-        job_type: job.type,
-        user_id: job.userId,
-      });
+      logger.info('job queued', { job_type: job.type, user_id: job.userId });
     },
   };
 }
@@ -209,7 +211,7 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
 
       const importsRepository = new ImportsRepository(pool);
       await registerImportRoutes(instance, {
-        service: new ImportsService(importsRepository, garments, storage, options.queue ?? recordOnlyQueue(logger)),
+        service: new ImportsService(importsRepository, garments, storage, options.queue ?? tableQueue(logger)),
         repository: importsRepository,
         identity,
       });

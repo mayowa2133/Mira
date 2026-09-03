@@ -19,7 +19,7 @@ import { buildServer } from '../../http/server.js';
 import { loadEnv } from '../../config/env.js';
 import { createDevVerifier } from '../identity/verify.js';
 import { createLogger } from '../../lib/logger.js';
-import { buildStorageKey, createLocalStorage, type StorageDriver } from '../../lib/storage.js';
+import { buildStorageKey, createLocalStorage, type StorageDriver } from '@mira/storage';
 import type { JobEnqueuer } from './service.js';
 
 const SECRET = 'imports-integration-secret';

@@ -14,7 +14,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireAuth, requireScope } from '../../http/auth.js';
 import { ApiError, ErrorCode, validationFailed } from '../../http/errors.js';
-import { BUCKETS, userOf, type BucketName, type StorageDriver } from '../../lib/storage.js';
+import { BUCKETS, userOf, type BucketName, type StorageDriver } from '@mira/storage';
 
 const CONTENT_TYPES: Record<string, string> = {
   jpg: 'image/jpeg',

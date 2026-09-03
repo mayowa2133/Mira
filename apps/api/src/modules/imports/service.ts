@@ -14,7 +14,7 @@
  */
 import { ApiError, ErrorCode } from '../../http/errors.js';
 import type { UserScope } from '../../db/scope.js';
-import { bucketOf, isSafeStorageKey, userOf, type StorageDriver } from '../../lib/storage.js';
+import { bucketOf, isSafeStorageKey, userOf, type StorageDriver } from '@mira/storage';
 import type { GarmentRepository } from '../closet/repository.js';
 import type { ImportsRepository } from './repository.js';
 

@@ -21,7 +21,7 @@ import { buildServer } from '../../http/server.js';
 import { loadEnv } from '../../config/env.js';
 import { createDevVerifier } from '../identity/verify.js';
 import { createLogger } from '../../lib/logger.js';
-import { createLocalStorage } from '../../lib/storage.js';
+import { createLocalStorage } from '@mira/storage';
 
 const SECRET = 'closet-integration-secret';
 const DATABASE_URL = process.env['DATABASE_URL'] ?? 'postgresql://mira:mira@localhost:5433/mira';
