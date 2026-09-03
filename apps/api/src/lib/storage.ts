@@ -48,6 +48,14 @@ export interface StorageDriver {
   ): Promise<{ uploadUrl: string; storageKey: string; expiresAt: string }>;
   put(storageKey: string, body: Buffer): Promise<void>;
   get(storageKey: string): Promise<Buffer | null>;
+  /**
+   * Is the object there?
+   *
+   * Separate from `get` because callers that only need presence — the photo
+   * import, checking an upload actually landed — should not pull megabytes
+   * through memory to find out.
+   */
+  exists(storageKey: string): Promise<boolean>;
   delete(storageKey: string): Promise<void>;
   verify(storageKey: string, userId: string, expires: number, signature: string): boolean;
 }
@@ -175,6 +183,13 @@ export function createLocalStorage(options: LocalStorageOptions): StorageDriver 
       const path = pathFor(storageKey);
       if (!existsSync(path)) return null;
       return readFile(path);
+    },
+
+    async exists(storageKey) {
+      // A traversal-unsafe key is treated as absent rather than resolved: it
+      // must never be able to answer questions about the filesystem.
+      if (!isSafeStorageKey(storageKey)) return false;
+      return existsSync(pathFor(storageKey));
     },
 
     async delete(storageKey) {

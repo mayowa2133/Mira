@@ -18,6 +18,9 @@ import { registerHealthRoutes } from '../modules/health/routes.js';
 import { registerIdentityRoutes } from '../modules/identity/routes.js';
 import { registerClosetRoutes } from '../modules/closet/routes.js';
 import { registerMediaRoutes } from '../modules/media/routes.js';
+import { registerImportRoutes } from '../modules/imports/routes.js';
+import { ImportsRepository } from '../modules/imports/repository.js';
+import { ImportsService, type JobEnqueuer } from '../modules/imports/service.js';
 import { ClosetService } from '../modules/closet/service.js';
 import { GarmentRepository } from '../modules/closet/repository.js';
 import { IdentityRepository } from '../modules/identity/repository.js';
@@ -35,7 +38,33 @@ export type BuildServerOptions = {
   storage?: StorageDriver;
   /** Injected for tests; defaults to resolving against the users table. */
   userResolver?: UserResolver;
+  /**
+   * Where background work is handed off.
+   *
+   * Defaults to recording the hand-off and nothing more. `ingestion_jobs` is
+   * the durable record either way — that row is what makes a failure visible
+   * and retryable (REL-3) — but until a shared transport exists, no worker
+   * process picks the job up. See tasks/current.md.
+   */
+  queue?: JobEnqueuer;
 };
+
+/**
+ * The default enqueuer: durable record, no transport.
+ *
+ * Deliberately loud rather than silent. A no-op that logged nothing would make
+ * an unprocessed queue look exactly like a working one.
+ */
+function recordOnlyQueue(logger: Logger): JobEnqueuer {
+  return {
+    async enqueue(job) {
+      logger.warn('job recorded but not dispatched — no queue transport configured', {
+        job_type: job.type,
+        user_id: job.userId,
+      });
+    },
+  };
+}
 
 export async function buildServer(options: BuildServerOptions): Promise<FastifyInstance> {
   const { env, verifier } = options;
@@ -149,6 +178,13 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
         identity,
       });
       await registerMediaRoutes(instance, { storage });
+
+      const importsRepository = new ImportsRepository(pool);
+      await registerImportRoutes(instance, {
+        service: new ImportsService(importsRepository, garments, storage, options.queue ?? recordOnlyQueue(logger)),
+        repository: importsRepository,
+        identity,
+      });
     },
     { prefix: '/v1' },
   );

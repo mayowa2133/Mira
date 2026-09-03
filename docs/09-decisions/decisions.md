@@ -232,3 +232,21 @@ Format:
   it is now a 64-bit DCT hash, 16 hex characters. Existing seeded rows carry the
   old 32-character value and must be reseeded, not migrated — the old value
   cannot be converted, only recomputed from pixels.
+
+## D-019 — An unanalyzed photo is category `other`, not a new sentinel
+
+- **Date:** 2026-09-03 · **Status:** Accepted
+- **Decision:** A garment created by photo import is stored with
+  `category = 'other'` and `analysis_state = 'analyzing'` until analysis
+  replaces both.
+- **Why:** `garments.category` is `not null references categories(id)`, but a
+  photograph has no category until it has been analyzed — and the whole point
+  of `data-flow.md` §1 is that the garment exists first. `other` is already a
+  member of the canonical taxonomy (`taxonomy.md` §1), so this places the
+  garment honestly without introducing an `unknown` value, which would be
+  widening the taxonomy from application code (INV-1).
+- **Consequences:** a filter for `other` will briefly surface garments that are
+  merely unanalyzed. `analysis_state` distinguishes them, and the closet already
+  renders an analyzing tile differently. If that proves confusing in use, the
+  answer is a taxonomy change with a migration — not a sentinel invented in the
+  service layer.

@@ -95,6 +95,14 @@ export type CreateGarmentInput = {
   sourceReference: string | null;
   tagsAttached: boolean | null;
   notes: string | null;
+  /**
+   * Overrides the default derived from `sourceType`.
+   *
+   * A photo import creates the garment already `analyzing`, because the job is
+   * enqueued in the same request and the closet should show that state from the
+   * first render rather than a garment that looks finished and then changes.
+   */
+  analysisState?: 'pending' | 'analyzing' | 'complete' | 'failed' | 'skipped';
 };
 
 export type UpdateGarmentInput = Partial<Omit<CreateGarmentInput, 'closetId' | 'sourceType'>>;
@@ -302,7 +310,7 @@ export class GarmentRepository {
         input.tagsAttached,
         input.notes,
         // Manually entered garments need no analysis: the user told us.
-        input.sourceType === 'manual' ? 'skipped' : 'pending',
+        input.analysisState ?? (input.sourceType === 'manual' ? 'skipped' : 'pending'),
       ],
     );
 

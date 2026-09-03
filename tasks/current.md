@@ -47,6 +47,24 @@ which is blocked on B-2.
 
 ## Blocked
 
+### B-5 — No queue transport between API and worker
+
+`POST /imports/photo` writes an `ingestion_jobs` row and calls the enqueuer;
+the default enqueuer logs a warning and stops there. The worker's queue is
+in-process, so nothing picks the job up: **image.process does not yet run
+end-to-end.**
+
+The pipeline itself is implemented and tested (`apps/worker/src/image/`), and
+`ingestion_jobs` is the durable record either way, so no capture is lost — the
+work is deferred, not dropped. What is missing is the transport.
+
+The likely resolution is to poll `ingestion_jobs` from the worker rather than
+add Redis: the row already exists, is already transactional with the garment,
+and a queue that can disagree with the user-visible job list is a bug waiting
+to happen. Deferred so the mobile capture path can be built against the real
+endpoint first.
+
+
 ### ~~B-2 — No iOS Simulator~~ — CLEARED 2026-09-03
 
 Xcode 26.6 is installed and the iOS 26.5 platform downloaded. The app builds,
