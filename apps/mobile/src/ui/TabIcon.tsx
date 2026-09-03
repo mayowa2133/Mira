@@ -1,4 +1,4 @@
-import { View } from 'react-native';
+import { View, type ColorValue } from 'react-native';
 import { radius, space } from '@mira/ui';
 
 export type TabIconName = 'home' | 'closet' | 'mira' | 'looks' | 'you';
@@ -11,7 +11,7 @@ export type TabIconName = 'home' | 'closet' | 'mira' | 'looks' | 'you';
  * bar is navigable and testable now, and so nothing depends on colour alone
  * (A11Y-4).
  */
-export function TabIcon({ name, tint }: { name: TabIconName; tint: string }) {
+export function TabIcon({ name, tint }: { name: TabIconName; tint: ColorValue }) {
   const size = space.xxl;
   const common = { width: size, height: size, borderColor: tint, borderWidth: 1.5 };
 

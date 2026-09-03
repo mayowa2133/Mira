@@ -6,6 +6,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { color } from '@mira/ui';
 import { ApiError } from '@/lib/api';
 import { SnackbarProvider } from '@/ui/Snackbar';
+import { bootstrapDevAuth } from '@/lib/dev-auth';
+
+// Development-only: real sign-in is task 0.5 and has no client yet. Inert in
+// any release build. See src/lib/dev-auth.ts.
+bootstrapDevAuth();
 
 /**
  * Root layout.

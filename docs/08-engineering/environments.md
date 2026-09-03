@@ -90,3 +90,45 @@ The iOS Simulator is the default verification surface (`AGENTS.md` Visual
 Implementation Rule item 10). Camera-dependent flows are verified on a physical
 device before a phase is considered complete — a simulator cannot photograph a
 garment tag.
+
+### Running the app on a simulator
+
+```bash
+npm run db:up && npm run db:migrate && npm run db:seed -- --set=realistic
+npm run api
+
+cd apps/mobile
+npx expo run:ios --device "<simulator UDID>"   # UDID, not name: a name can
+                                               # resolve to a physical device
+```
+
+Two setup problems worth knowing, because both fail with unhelpful messages:
+
+- **CocoaPods needs a UTF-8 locale.** Without one, `pod install` dies with
+  `Unicode Normalization not appropriate for ASCII-8BIT`. Export
+  `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8` before running it.
+- **Pass a simulator UDID, not a name.** Given a name that does not match,
+  `expo run:ios` falls back to `Any iOS Device` and fails with
+  `iOS <version> is not installed`, which reads like a missing SDK rather than
+  a wrong destination. `xcrun simctl list devices booted` gives the UDID.
+
+### Signing in during development
+
+There is no sign-in screen yet — that is task 0.5, whose API half is built and
+tested but whose client half is not. Without a token every request 401s and the
+closet screens can only be seen in their error state.
+
+`apps/mobile/src/lib/dev-auth.ts` reads `EXPO_PUBLIC_DEV_AUTH_TOKEN` when
+`__DEV__` is true, so the real screens can be exercised against the real API:
+
+```bash
+TOKEN=$(cd apps/api && node -e "const {SignJWT}=require('jose');
+  new SignJWT({}).setProtectedHeader({alg:'HS256'})
+    .setSubject('seed-realistic-1').setAudience('mira').setExpirationTime('30d')
+    .sign(new TextEncoder().encode('miradev')).then(t=>console.log(t))")
+
+EXPO_PUBLIC_DEV_AUTH_TOKEN="$TOKEN" npx expo start
+```
+
+It is inert in any release build, and the dev verifier that mints such a token
+cannot run outside `MIRA_ENV=local`. Delete the module when 0.5 lands.

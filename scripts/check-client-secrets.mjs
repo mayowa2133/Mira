@@ -37,12 +37,32 @@ function sourceFiles(dir) {
   return out;
 }
 
+/**
+ * Strip comments and string literals before scanning.
+ *
+ * Only a real reference can put a value in the bundle. Mira's source cites spec
+ * names constantly — a checker that fails on a NAME IN A COMMENT trains people
+ * to stop writing comments, or to suppress the check, and then it stops
+ * catching the thing it exists for.
+ *
+ * String literals are stripped too: `"see MIRA_ENV"` in an error message is
+ * prose, and an actual read is `process.env.MIRA_ENV`, which survives stripping.
+ */
+function stripNonCode(source) {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, ' ') // block comments
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ') // line comments, sparing URLs
+    .replace(/'(?:[^'\\\n]|\\.)*'/g, "''") // single-quoted strings
+    .replace(/"(?:[^"\\\n]|\\.)*"/g, '""') // double-quoted strings
+    .replace(/`(?:[^`\\]|\\.)*`/g, '``'); // template literals
+}
+
 const names = serverOnlyNames();
 const files = sourceFiles(MOBILE);
 const violations = [];
 
 for (const file of files) {
-  const content = readFileSync(file, 'utf8');
+  const content = stripNonCode(readFileSync(file, 'utf8'));
   for (const name of names) {
     if (new RegExp(`\\b${name}\\b`).test(content)) {
       violations.push(`${file.replace(root + '/', '')}: references server-only ${name}`);
