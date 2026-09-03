@@ -1,0 +1,1410 @@
+openapi: 3.1.0
+
+info:
+  title: Mira API
+  version: 1.0.0
+  description: |
+    Mira — your closet, your stylist, your mirror.
+
+    Canonical contract for the Mira API. Enumerated values come from
+    docs/04-data/taxonomy.md and MUST NOT be extended by implementations.
+
+    Rules that apply to every operation:
+      - Responses contain only the authenticated user's data.
+      - A resource owned by another user returns 404, never 403.
+      - Every creating POST requires an Idempotency-Key header.
+      - Image URLs are signed and expiring; clients must honour urlExpiresAt.
+
+servers:
+  - url: https://api.mira.app/v1
+    description: Production
+  - url: https://api.staging.mira.app/v1
+    description: Staging
+  - url: http://localhost:4000/v1
+    description: Local
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: auth
+  - name: closet
+  - name: garments
+  - name: ingestion
+  - name: purchases
+  - name: search
+  - name: outfits
+  - name: wear
+  - name: tryon
+  - name: insights
+  - name: system
+
+paths:
+
+  /auth/session:
+    post:
+      tags: [auth]
+      summary: Exchange a provider token for a Mira session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, token]
+              properties:
+                provider:
+                  type: string
+                  enum: [apple, google, email]
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags: [auth]
+      summary: Sign out
+      responses:
+        '204':
+          description: Signed out
+
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: Current user
+      responses:
+        '200':
+          description: The authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /auth/account:
+    delete:
+      tags: [auth]
+      summary: Delete the account and all associated private data
+      responses:
+        '202':
+          description: Deletion scheduled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAccepted'
+
+  /closet:
+    get:
+      tags: [closet]
+      summary: Closet summary
+      responses:
+        '200':
+          description: Counts and recent additions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClosetSummary'
+
+  /garments:
+    get:
+      tags: [garments]
+      summary: List garments
+      parameters:
+        - { in: query, name: category, schema: { type: array, items: { type: string } }, style: form, explode: true }
+        - { in: query, name: subcategory, schema: { type: array, items: { type: string } }, style: form, explode: true }
+        - { in: query, name: brand_id, schema: { type: array, items: { type: string, format: uuid } }, style: form, explode: true }
+        - { in: query, name: color, schema: { type: array, items: { type: string } }, style: form, explode: true }
+        - { in: query, name: size, schema: { type: array, items: { type: string } }, style: form, explode: true }
+        - { in: query, name: season, schema: { type: array, items: { type: string } }, style: form, explode: true }
+        - { in: query, name: occasion, schema: { type: array, items: { type: string } }, style: form, explode: true }
+        - { in: query, name: material, schema: { type: array, items: { type: string } }, style: form, explode: true }
+        - { in: query, name: style_tag, schema: { type: array, items: { type: string } }, style: form, explode: true }
+        - { in: query, name: retailer, schema: { type: array, items: { type: string } }, style: form, explode: true }
+        - { in: query, name: status, schema: { type: array, items: { $ref: '#/components/schemas/GarmentStatus' } }, style: form, explode: true }
+        - { in: query, name: favorite, schema: { type: boolean } }
+        - { in: query, name: tags_attached, schema: { type: boolean } }
+        - { in: query, name: never_worn, schema: { type: boolean } }
+        - { in: query, name: not_worn_since_days, schema: { type: integer, minimum: 1 } }
+        - { in: query, name: purchased_after, schema: { type: string, format: date } }
+        - { in: query, name: purchased_before, schema: { type: string, format: date } }
+        - { in: query, name: price_min, schema: { type: number } }
+        - { in: query, name: price_max, schema: { type: number } }
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum: [recent, recently_worn, never_worn, brand, color, price_desc, price_asc]
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A page of garments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GarmentPage'
+    post:
+      tags: [garments]
+      summary: Create a garment
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GarmentCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Garment'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /garments/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [garments]
+      summary: Get a garment
+      responses:
+        '200':
+          description: The garment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Garment'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [garments]
+      summary: Update a garment
+      description: source.type is immutable and MUST be rejected if present.
+      parameters:
+        - in: header
+          name: If-Match
+          schema: { type: string }
+          description: The garment's updatedAt value, for optimistic concurrency.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GarmentUpdate'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Garment'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [garments]
+      summary: Remove a garment (soft delete)
+      responses:
+        '204':
+          description: Removed
+
+  /garments/{id}/favorite:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [garments]
+      summary: Set favourite state
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [favorite]
+              properties:
+                favorite: { type: boolean }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Garment'
+
+  /garments/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [garments]
+      summary: Set garment status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: '#/components/schemas/GarmentStatus' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Garment'
+
+  /garments/{id}/goes-with:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [garments]
+      summary: Owned garments that pair well with this one
+      responses:
+        '200':
+          description: Suggestions from the user's own closet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GarmentPage'
+
+  /garments/{id}/similar:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [garments]
+      summary: Visually similar owned garments
+      responses:
+        '200':
+          description: Similar garments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GarmentPage'
+
+  /garments/analyze:
+    post:
+      tags: [ingestion]
+      summary: Analyze an uploaded garment photo
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upload_key]
+              properties:
+                upload_key: { type: string }
+                source_type:
+                  type: string
+                  enum: [camera, photo_library]
+      responses:
+        '202':
+          description: Analysis queued; the garment exists in an analyzing state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GarmentAccepted'
+
+  /garments/tag-scan:
+    post:
+      tags: [ingestion]
+      summary: Identify a garment from a tag, barcode or SKU
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                upload_key: { type: string }
+                barcode: { type: string }
+                sku: { type: string }
+      responses:
+        '200':
+          description: Confident identification
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagIdentification'
+        '202':
+          description: Queued for analysis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GarmentAccepted'
+
+  /garments/check-duplicate:
+    post:
+      tags: [ingestion]
+      summary: Check whether a garment about to be created already exists
+      description: Called by every ingestion path before creation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DuplicateCheckRequest'
+      responses:
+        '200':
+          description: Duplicate candidates, most likely first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  candidates:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DuplicateCandidate'
+
+  /media/upload-url:
+    post:
+      tags: [ingestion]
+      summary: Get a scoped, short-lived upload URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [purpose, content_type]
+              properties:
+                purpose:
+                  type: string
+                  enum: [garment, body, receipt]
+                content_type: { type: string }
+      responses:
+        '200':
+          description: Upload target
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  upload_url: { type: string, format: uri }
+                  upload_key: { type: string }
+                  expires_at: { type: string, format: date-time }
+
+  /imports/photo:
+    post:
+      tags: [ingestion]
+      summary: Import a garment from an uploaded photo
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upload_key]
+              properties:
+                upload_key: { type: string }
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GarmentAccepted'
+
+  /imports/receipt:
+    post:
+      tags: [ingestion]
+      summary: Import garments from a receipt
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upload_key]
+              properties:
+                upload_key: { type: string }
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAccepted'
+
+  /imports/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [ingestion]
+      summary: Import status and extracted items
+      responses:
+        '200':
+          description: The import
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Import'
+
+  /imports/{id}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [ingestion]
+      summary: Create garments from selected extracted items
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [selected_item_ids]
+              properties:
+                selected_item_ids:
+                  type: array
+                  items: { type: string }
+      responses:
+        '201':
+          description: Garments created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  garments:
+                    type: array
+                    items: { $ref: '#/components/schemas/Garment' }
+
+  /purchase-candidates:
+    get:
+      tags: [purchases]
+      summary: List purchase candidates
+      description: Candidates are NOT garments and never appear in closet responses.
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/PurchaseCandidateStatus' }
+          style: form
+          explode: true
+        - { in: query, name: retailer, schema: { type: string } }
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A page of candidates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PurchaseCandidate' }
+                  next_cursor: { type: string, nullable: true }
+
+  /purchase-candidates/summary:
+    get:
+      tags: [purchases]
+      summary: Candidate counts by retailer and status
+      responses:
+        '200':
+          description: Summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: integer }
+                  by_retailer:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        retailer: { type: string }
+                        count: { type: integer }
+                  by_status:
+                    type: object
+                    additionalProperties: { type: integer }
+
+  /purchase-candidates/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [purchases]
+      summary: Set candidate status
+      description: |
+        Only a transition to confirmed_owned creates a garment. Every other
+        status leaves the closet unchanged.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: '#/components/schemas/PurchaseCandidateStatus' }
+      responses:
+        '200':
+          description: Updated candidate, with linkedGarmentId when one was created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseCandidate'
+
+  /integrations/email:
+    get:
+      tags: [purchases]
+      summary: List email connections
+      description: Tokens are never returned.
+      responses:
+        '200':
+          description: Connections
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EmailConnection' }
+
+  /integrations/email/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    delete:
+      tags: [purchases]
+      summary: Disconnect an email account
+      parameters:
+        - in: query
+          name: delete_candidates
+          schema: { type: boolean, default: false }
+      responses:
+        '204':
+          description: Disconnected
+
+  /closet/search:
+    get:
+      tags: [search]
+      summary: Search the closet
+      description: Always returns the interpretation, so the user can correct it.
+      parameters:
+        - { in: query, name: q, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Results plus interpretation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResult'
+
+  /outfits:
+    get:
+      tags: [outfits]
+      summary: List outfits
+      parameters:
+        - in: query
+          name: tab
+          schema:
+            type: string
+            enum: [saved, worn, mira, mine]
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A page of outfits
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Outfit' }
+                  next_cursor: { type: string, nullable: true }
+    post:
+      tags: [outfits]
+      summary: Create an outfit
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                name: { type: string, nullable: true }
+                occasion: { type: string, nullable: true }
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [slot, garment_id]
+                    properties:
+                      slot: { $ref: '#/components/schemas/OutfitSlot' }
+                      garment_id: { type: string, format: uuid }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Outfit'
+
+  /outfits/generate:
+    post:
+      tags: [outfits]
+      summary: Ask Mira to style an outfit
+      description: |
+        Every returned garment id is validated against a server-built candidate
+        set of the user's eligible garments. Garments that are not owned, or not
+        outfit-eligible, can never appear in a proposal.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prompt: { type: string }
+                vibe:
+                  type: array
+                  items: { type: string }
+                priority:
+                  type: string
+                  enum: [something_new, havent_worn_lately, favourite_pieces, surprise_me]
+                anchor_garment_id: { type: string, format: uuid, nullable: true }
+                count: { type: integer, minimum: 1, maximum: 5, default: 3 }
+      responses:
+        '200':
+          description: Proposals
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recommendation_id: { type: string, format: uuid }
+                  looks:
+                    type: array
+                    items: { $ref: '#/components/schemas/OutfitProposal' }
+
+  /outfits/{id}/swap:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [outfits]
+      summary: Swap one slot in an outfit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slot, garment_id]
+              properties:
+                slot: { $ref: '#/components/schemas/OutfitSlot' }
+                garment_id: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Updated outfit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Outfit'
+
+  /wear-events:
+    post:
+      tags: [wear]
+      summary: Record a wear
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [worn_on]
+              properties:
+                garment_id: { type: string, format: uuid, nullable: true }
+                outfit_id: { type: string, format: uuid, nullable: true }
+                worn_on: { type: string, format: date }
+      responses:
+        '201':
+          description: Recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WearEvent'
+
+  /body-profile:
+    get:
+      tags: [tryon]
+      summary: Get the body profile
+      responses:
+        '200':
+          description: The profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BodyProfile'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [tryon]
+      summary: Create or update the body profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                height_cm: { type: integer, nullable: true }
+                usual_sizes:
+                  type: object
+                  additionalProperties: { type: string }
+                fit_preferences:
+                  type: object
+                  additionalProperties: { type: string }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BodyProfile'
+    delete:
+      tags: [tryon]
+      summary: Delete the body profile and all its images
+      responses:
+        '204':
+          description: Deleted
+
+  /try-on:
+    post:
+      tags: [tryon]
+      summary: Generate a try-on
+      description: Returns an existing generation when the input fingerprint matches.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [outfit_id, body_profile_id]
+              properties:
+                outfit_id: { type: string, format: uuid }
+                body_profile_id: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Cache hit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TryOnGeneration'
+        '202':
+          description: Generation queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TryOnGeneration'
+
+  /try-on/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [tryon]
+      summary: Get a try-on generation
+      responses:
+        '200':
+          description: The generation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TryOnGeneration'
+    delete:
+      tags: [tryon]
+      summary: Delete a try-on generation permanently
+      responses:
+        '204':
+          description: Deleted
+
+  /wardrobe/insights:
+    get:
+      tags: [insights]
+      summary: Wardrobe insights
+      parameters:
+        - in: query
+          name: kinds
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [forgotten, never_worn, tags_attached, most_loved, similar_owned, cost_per_wear, closet_value]
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: Insights with hydrated garments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  insights:
+                    type: array
+                    items: { type: object }
+
+  /jobs/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [system]
+      summary: Job status
+      responses:
+        '200':
+          description: The job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+
+  /health:
+    get:
+      tags: [system]
+      summary: Liveness
+      security: []
+      responses:
+        '200':
+          description: OK
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Id:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
+    Cursor:
+      in: query
+      name: cursor
+      schema: { type: string }
+    Limit:
+      in: query
+      name: limit
+      schema: { type: integer, minimum: 1, maximum: 100, default: 40 }
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: true
+      schema: { type: string, maxLength: 128 }
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid credentials
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Not found, or not the caller's resource
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Concurrency or idempotency conflict
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ValidationError:
+      description: Request failed validation
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field: { type: string }
+                  issue: { type: string }
+            request_id: { type: string }
+            retry_after: { type: integer, nullable: true }
+
+    Session:
+      type: object
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        expires_at: { type: string, format: date-time }
+        user: { $ref: '#/components/schemas/User' }
+
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email, nullable: true }
+        display_name: { type: string, nullable: true }
+        avatar_url: { type: string, nullable: true }
+        onboarding_state:
+          type: string
+          enum: [not_started, in_progress, completed, skipped]
+        auto_import_enabled: { type: boolean }
+
+    Money:
+      type: object
+      properties:
+        amount: { type: number }
+        currency: { type: string, minLength: 3, maxLength: 3 }
+
+    GarmentStatus:
+      type: string
+      enum: [active, laundry, unavailable, lent_out, returned, sold, donated, lost, archived]
+
+    SourceType:
+      type: string
+      enum: [manual, camera, photo_library, tag_scan, barcode, receipt, email, retailer_integration, product_url, order_screenshot]
+
+    PurchaseCandidateStatus:
+      type: string
+      enum: [detected, processing, needs_review, confirmed_owned, returned, not_mine, removed, uncertain, ignored]
+
+    OutfitSlot:
+      type: string
+      enum: [top, bottom, dress, layer, shoes, bag, accessory]
+
+    ImageKind:
+      type: string
+      enum: [canonical, original, cleaned, front, back, side, detail, retailer]
+
+    GarmentImage:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        kind: { $ref: '#/components/schemas/ImageKind' }
+        url: { type: string, format: uri }
+        url_expires_at: { type: string, format: date-time }
+        width: { type: integer, nullable: true }
+        height: { type: integer, nullable: true }
+        blurhash: { type: string, nullable: true }
+        is_canonical: { type: boolean }
+        position: { type: integer }
+
+    Brand:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        logo_url: { type: string, nullable: true }
+
+    Garment:
+      type: object
+      required: [id, category, status, source]
+      properties:
+        id: { type: string, format: uuid }
+        closet_id: { type: string, format: uuid }
+        name: { type: string, nullable: true }
+        brand: { $ref: '#/components/schemas/Brand' }
+        brand_raw: { type: string, nullable: true }
+        category: { type: string, description: taxonomy §1 }
+        subcategory: { type: string, nullable: true }
+        primary_color: { type: string, nullable: true }
+        secondary_colors: { type: array, items: { type: string } }
+        pattern: { type: string, nullable: true }
+        materials: { type: array, items: { type: string } }
+        size:
+          type: object
+          properties:
+            raw: { type: string, nullable: true }
+            normalized: { type: string, nullable: true }
+            system: { type: string, nullable: true }
+        fit: { type: string, nullable: true }
+        season: { type: array, items: { type: string } }
+        occasion: { type: array, items: { type: string } }
+        style_tags: { type: array, items: { type: string } }
+        purchase:
+          type: object
+          properties:
+            date: { type: string, format: date, nullable: true }
+            price: { $ref: '#/components/schemas/Money' }
+            retailer: { type: string, nullable: true }
+        identifiers:
+          type: object
+          properties:
+            sku: { type: string, nullable: true }
+            barcode: { type: string, nullable: true }
+            product_url: { type: string, nullable: true }
+        source:
+          type: object
+          description: Immutable provenance.
+          properties:
+            type: { $ref: '#/components/schemas/SourceType' }
+            reference: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/GarmentStatus' }
+        favorite: { type: boolean }
+        tags_attached: { type: boolean, nullable: true }
+        notes: { type: string, nullable: true }
+        wear:
+          type: object
+          properties:
+            count: { type: integer }
+            last_worn_at: { type: string, format: date-time, nullable: true }
+            cost_per_wear: { $ref: '#/components/schemas/Money' }
+        images:
+          type: array
+          items: { $ref: '#/components/schemas/GarmentImage' }
+        canonical_image: { $ref: '#/components/schemas/GarmentImage' }
+        analysis_state:
+          type: string
+          enum: [pending, analyzing, complete, failed, skipped]
+        confidence:
+          type: object
+          additionalProperties: { type: number, minimum: 0, maximum: 1 }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    GarmentCreate:
+      type: object
+      required: [category]
+      properties:
+        name: { type: string, nullable: true }
+        brand_raw: { type: string, nullable: true }
+        category: { type: string }
+        subcategory: { type: string, nullable: true }
+        primary_color: { type: string, nullable: true }
+        secondary_colors: { type: array, items: { type: string } }
+        pattern: { type: string, nullable: true }
+        materials: { type: array, items: { type: string } }
+        size_raw: { type: string, nullable: true }
+        fit: { type: string, nullable: true }
+        season: { type: array, items: { type: string } }
+        occasion: { type: array, items: { type: string } }
+        style_tags: { type: array, items: { type: string } }
+        purchase_date: { type: string, format: date, nullable: true }
+        purchase_price: { type: number, nullable: true }
+        currency: { type: string, nullable: true }
+        retailer: { type: string, nullable: true }
+        sku: { type: string, nullable: true }
+        barcode: { type: string, nullable: true }
+        product_url: { type: string, nullable: true }
+        source_type: { $ref: '#/components/schemas/SourceType' }
+        source_reference: { type: string, nullable: true }
+        image_upload_keys: { type: array, items: { type: string } }
+        tags_attached: { type: boolean, nullable: true }
+        notes: { type: string, nullable: true }
+        duplicate_resolution:
+          type: string
+          enum: [none, owns_two, different]
+          default: none
+
+    GarmentUpdate:
+      allOf:
+        - $ref: '#/components/schemas/GarmentCreate'
+        - type: object
+          description: source_type is immutable; sending it results in 422.
+
+    GarmentPage:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Garment' }
+        next_cursor: { type: string, nullable: true }
+        total: { type: integer, nullable: true }
+
+    GarmentAccepted:
+      type: object
+      properties:
+        garment_id: { type: string, format: uuid }
+        job_id: { type: string, format: uuid }
+
+    JobAccepted:
+      type: object
+      properties:
+        job_id: { type: string, format: uuid }
+
+    Job:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        job_type: { type: string }
+        status:
+          type: string
+          enum: [queued, running, complete, failed, cancelled]
+        attempts: { type: integer }
+        error_code: { type: string, nullable: true }
+        entity_type: { type: string, nullable: true }
+        entity_id: { type: string, format: uuid, nullable: true }
+
+    ClosetSummary:
+      type: object
+      properties:
+        total: { type: integer }
+        by_category:
+          type: array
+          items:
+            type: object
+            properties:
+              category: { type: string }
+              count: { type: integer }
+        recently_added:
+          type: array
+          items: { $ref: '#/components/schemas/Garment' }
+
+    TagIdentification:
+      type: object
+      properties:
+        matched: { type: boolean }
+        brand: { type: string, nullable: true }
+        product_name: { type: string, nullable: true }
+        color: { type: string, nullable: true }
+        size: { type: string, nullable: true }
+        sku: { type: string, nullable: true }
+        barcode: { type: string, nullable: true }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+
+    DuplicateCheckRequest:
+      type: object
+      properties:
+        sku: { type: string, nullable: true }
+        barcode: { type: string, nullable: true }
+        product_url: { type: string, nullable: true }
+        brand: { type: string, nullable: true }
+        name: { type: string, nullable: true }
+        category: { type: string, nullable: true }
+        primary_color: { type: string, nullable: true }
+        purchase_date: { type: string, format: date, nullable: true }
+        image_upload_key: { type: string, nullable: true }
+
+    DuplicateCandidate:
+      type: object
+      properties:
+        existing_garment: { $ref: '#/components/schemas/Garment' }
+        score: { type: number, minimum: 0, maximum: 1 }
+        signals:
+          type: array
+          items:
+            type: string
+            enum: [sku, barcode, product_url, order, visual, name, date]
+
+    Import:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        kind:
+          type: string
+          enum: [photo, receipt, email, product_url]
+        status:
+          type: string
+          enum: [pending, parsing, needs_review, complete, failed]
+        retailer: { type: string, nullable: true }
+        purchase_date: { type: string, format: date, nullable: true }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              raw_name: { type: string }
+              product_name: { type: string, nullable: true }
+              price: { $ref: '#/components/schemas/Money' }
+              is_clothing: { type: boolean }
+              suggested_category: { type: string, nullable: true }
+              confidence: { type: number }
+        error_code: { type: string, nullable: true }
+
+    PurchaseCandidate:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        source:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [email, receipt, retailer_integration, order_screenshot]
+            id: { type: string }
+        retailer: { type: string, nullable: true }
+        order_number: { type: string, nullable: true }
+        purchase_date: { type: string, format: date, nullable: true }
+        price: { $ref: '#/components/schemas/Money' }
+        raw_item_name: { type: string }
+        product_name: { type: string, nullable: true }
+        brand: { type: string, nullable: true }
+        identifiers:
+          type: object
+          properties:
+            sku: { type: string, nullable: true }
+            barcode: { type: string, nullable: true }
+            product_url: { type: string, nullable: true }
+        image_url: { type: string, nullable: true }
+        match_confidence: { type: number, nullable: true }
+        status: { $ref: '#/components/schemas/PurchaseCandidateStatus' }
+        linked_garment_id: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    EmailConnection:
+      type: object
+      description: Tokens are never included.
+      properties:
+        id: { type: string, format: uuid }
+        provider: { type: string, enum: [gmail, outlook] }
+        email_address: { type: string, format: email }
+        status: { type: string, enum: [active, expired, revoked, error] }
+        last_scan_at: { type: string, format: date-time, nullable: true }
+
+    SearchResult:
+      type: object
+      properties:
+        interpretation:
+          type: object
+          description: What Mira understood, rendered as removable chips.
+          properties:
+            filters: { type: object }
+            semantic_terms: { type: array, items: { type: string } }
+            sort: { type: string, nullable: true }
+        garments:
+          type: array
+          items: { $ref: '#/components/schemas/Garment' }
+        next_cursor: { type: string, nullable: true }
+        total: { type: integer, nullable: true }
+
+    Outfit:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, nullable: true }
+        occasion: { type: string, nullable: true }
+        season: { type: array, items: { type: string } }
+        origin: { type: string, enum: [user, mira] }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              slot: { $ref: '#/components/schemas/OutfitSlot' }
+              garment: { $ref: '#/components/schemas/Garment' }
+              position: { type: integer }
+        cover_image_url: { type: string, nullable: true }
+        favorite: { type: boolean }
+        wear:
+          type: object
+          properties:
+            count: { type: integer }
+            last_worn_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    OutfitProposal:
+      type: object
+      properties:
+        title: { type: string }
+        rationale: { type: string, nullable: true }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              slot: { $ref: '#/components/schemas/OutfitSlot' }
+              garment_id: { type: string, format: uuid }
+        missing_slots:
+          type: array
+          items: { $ref: '#/components/schemas/OutfitSlot' }
+
+    WearEvent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        garment_id: { type: string, format: uuid, nullable: true }
+        outfit_id: { type: string, format: uuid, nullable: true }
+        worn_on: { type: string, format: date }
+        created_at: { type: string, format: date-time }
+
+    BodyProfile:
+      type: object
+      description: Private. Never included in any other response.
+      properties:
+        id: { type: string, format: uuid }
+        height_cm: { type: integer, nullable: true }
+        usual_sizes:
+          type: object
+          additionalProperties: { type: string }
+        fit_preferences:
+          type: object
+          additionalProperties: { type: string }
+        images:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              kind: { type: string, enum: [front, side, back, reference] }
+              url: { type: string, format: uri }
+              url_expires_at: { type: string, format: date-time }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    TryOnGeneration:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        outfit_id: { type: string, format: uuid, nullable: true }
+        body_profile_id: { type: string, format: uuid }
+        status: { type: string, enum: [queued, generating, complete, failed] }
+        image_url: { type: string, format: uri, nullable: true }
+        url_expires_at: { type: string, format: date-time, nullable: true }
+        garments:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string, nullable: true }
+              brand: { type: string, nullable: true }
+        favorite: { type: boolean }
+        rating: { type: integer, nullable: true, minimum: 1, maximum: 5 }
+        error_code: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
