@@ -12,6 +12,7 @@
     "clean": "rm -rf .expo dist"
   },
   "dependencies": {
+    "@mira/taxonomy": "*",
     "@mira/types": "*",
     "@mira/ui": "*",
     "@shopify/flash-list": "2.0.2",

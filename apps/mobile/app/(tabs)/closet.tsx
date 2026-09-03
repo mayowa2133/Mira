@@ -1,48 +1,57 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { color, space, type } from '@mira/ui';
+import { color, radius, space, type } from '@mira/ui';
 import { ClosetGrid } from '@/features/closet/ClosetGrid';
 import { CategoryChips } from '@/features/closet/CategoryChips';
+import { FilterSheet } from '@/features/closet/FilterSheet';
 import {
-  useClosetSummary,
-  useGarments,
-  useToggleFavorite,
-  type ClosetFilters,
-} from '@/features/closet/queries';
+  EMPTY_FILTERS,
+  appliedChips,
+  countActive,
+  isEmpty,
+  toQueryFilters,
+  type FilterState,
+} from '@/features/closet/filter-state';
+import { useClosetSummary, useGarments, useToggleFavorite } from '@/features/closet/queries';
 
 /**
  * Closet (`docs/02-design/screen-specs.md` §14).
  *
- *   Closet                          + Add
- *   327 pieces
- *   [ Search your closet ]
- *   All  Tops  Bottoms  Dresses  Shoes →
- *   Filter                          Sort
- *   [two-column grid]
+ * Two columns, never three (D-009). Applied filters remain VISIBLE as
+ * dismissible chips while browsing, so the user can always see and undo what
+ * narrowed the grid (Reference 03).
  *
- * Two columns, never three (D-009). Search and the filter sheet arrive with
- * Phase 5 and the rest of 1.8.
+ * The category chips are a fast path over the same filter state as the sheet,
+ * so the two can never disagree about what is applied.
  */
 export default function ClosetScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [category, setCategory] = useState<string | null>(null);
 
-  const filters: ClosetFilters = useMemo(
-    () => (category ? { category: [category] } : {}),
-    [category],
-  );
+  const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const queryFilters = useMemo(() => toQueryFilters(filters), [filters]);
 
   const summary = useClosetSummary();
-  const garments = useGarments(filters);
+  const garments = useGarments(queryFilters);
   const toggleFavorite = useToggleFavorite();
 
   const items = useMemo(
     () => garments.data?.pages.flatMap((page) => page.data) ?? [],
     [garments.data],
   );
+
+  const chips = useMemo(() => appliedChips(filters), [filters]);
+
+  /** The category chip row reflects a single selected category, if exactly one. */
+  const selectedCategory = filters.category.length === 1 ? (filters.category[0] ?? null) : null;
+
+  const handleSelectCategory = useCallback((category: string | null) => {
+    setFilters((prev) => ({ ...prev, category: category ? [category] : [] }));
+  }, []);
 
   const handlePressGarment = useCallback((id: string) => router.push(`/garment/${id}`), [router]);
 
@@ -61,7 +70,14 @@ export default function ClosetScreen() {
   }, [garments, summary]);
 
   const handleAdd = useCallback(() => router.push('/add'), [router]);
+  const handleClearFilters = useCallback(() => setFilters(EMPTY_FILTERS), []);
 
+  const handleApplyFilters = useCallback((next: FilterState) => {
+    setFilters(next);
+    setSheetOpen(false);
+  }, []);
+
+  const activeCount = countActive(filters);
   const total = summary.data?.total;
 
   const header = (
@@ -85,7 +101,43 @@ export default function ClosetScreen() {
         </Pressable>
       </View>
 
-      <CategoryChips selected={category} onSelect={setCategory} />
+      <CategoryChips selected={selectedCategory} onSelect={handleSelectCategory} />
+
+      <View style={styles.controls}>
+        <Pressable
+          onPress={() => setSheetOpen(true)}
+          style={styles.control}
+          accessibilityRole="button"
+          accessibilityLabel={
+            activeCount > 0 ? `Filter, ${activeCount} applied` : 'Filter your closet'
+          }
+        >
+          <Text style={styles.controlLabel}>
+            Filter{activeCount > 0 ? ` · ${activeCount}` : ''}
+          </Text>
+        </Pressable>
+      </View>
+
+      {chips.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRow}
+        >
+          {chips.map((chip) => (
+            <Pressable
+              key={chip.key}
+              onPress={() => setFilters(chip.remove)}
+              style={styles.appliedChip}
+              accessibilityRole="button"
+              accessibilityLabel={`${chip.label}, applied filter. Double tap to remove.`}
+            >
+              <Text style={styles.appliedChipLabel}>{chip.label}</Text>
+              <Text style={styles.appliedChipRemove}>✕</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : null}
     </View>
   );
 
@@ -95,16 +147,23 @@ export default function ClosetScreen() {
         garments={items}
         isLoading={garments.isPending}
         error={garments.error}
-        hasFilters={category !== null}
+        hasFilters={!isEmpty(filters)}
         isFetchingNextPage={garments.isFetchingNextPage}
         onEndReached={handleEndReached}
         onRefresh={handleRefresh}
         isRefreshing={garments.isRefetching && !garments.isFetchingNextPage}
         onPressGarment={handlePressGarment}
         onToggleFavorite={handleToggleFavorite}
-        onClearFilters={() => setCategory(null)}
+        onClearFilters={handleClearFilters}
         onAddFirst={handleAdd}
         header={header}
+      />
+
+      <FilterSheet
+        visible={sheetOpen}
+        initial={filters}
+        onClose={() => setSheetOpen(false)}
+        onApply={handleApplyFilters}
       />
     </View>
   );
@@ -127,14 +186,31 @@ const styles = StyleSheet.create({
     lineHeight: type.subhead.lineHeight,
     color: color.textSecondary,
   },
-  add: {
-    minHeight: space.tapMin,
-    justifyContent: 'center',
-    paddingHorizontal: space.sm,
-  },
+  add: { minHeight: space.tapMin, justifyContent: 'center', paddingHorizontal: space.sm },
   addLabel: {
     fontSize: type.bodyStrong.fontSize,
     fontWeight: type.bodyStrong.fontWeight,
     color: color.text,
   },
+
+  controls: { flexDirection: 'row', paddingTop: space.sm },
+  control: { minHeight: space.tapMin, justifyContent: 'center', paddingRight: space.lg },
+  controlLabel: {
+    fontSize: type.subhead.fontSize,
+    fontWeight: type.bodyStrong.fontWeight,
+    color: color.text,
+  },
+
+  chipRow: { gap: space.sm, paddingBottom: space.sm },
+  appliedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    minHeight: 36,
+    paddingHorizontal: space.md,
+    borderRadius: radius.full,
+    backgroundColor: color.accentSoft,
+  },
+  appliedChipLabel: { fontSize: type.subhead.fontSize, color: color.text },
+  appliedChipRemove: { fontSize: type.caption.fontSize, color: color.textSecondary },
 });

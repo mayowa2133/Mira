@@ -227,3 +227,40 @@ export function useRestoreGarment() {
     },
   });
 }
+
+/**
+ * Create a garment.
+ *
+ * Every creating POST carries an Idempotency-Key, so a retry — a flaky network,
+ * a double tap — cannot produce two garments
+ * (`docs/05-api/api-contract.md` — Conventions).
+ */
+export function useCreateGarment() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Record<string, unknown>) =>
+      request<Garment>('/garments', {
+        method: 'POST',
+        body: payload,
+        idempotencyKey: globalThis.crypto.randomUUID(),
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['garments'] });
+      void client.invalidateQueries({ queryKey: closetKeys.summary });
+    },
+  });
+}
+
+/** Edit a garment. Never sends `source_type`: provenance is immutable (CAP-3). */
+export function useUpdateGarment(id: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Record<string, unknown>) =>
+      request<Garment>(`/garments/${id}`, { method: 'PATCH', body: payload }),
+    onSuccess: (garment) => {
+      client.setQueryData(closetKeys.garment(id), garment);
+      void client.invalidateQueries({ queryKey: ['garments'] });
+      void client.invalidateQueries({ queryKey: closetKeys.summary });
+    },
+  });
+}

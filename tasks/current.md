@@ -3,8 +3,9 @@
 **Phase:** 1 — Closet core (in progress)
 **Updated:** 2026-09-03
 
-`npm run verify` is green: typecheck, format, lint and **294 tests**, including
-33 integration tests against a real Postgres 16 + pgvector.
+`npm run verify` is green: typecheck, format, lint and **335 tests**, including
+33 integration tests against a real Postgres 16 + pgvector and 41 covering the
+React-free form and filter logic.
 
 ---
 
@@ -17,9 +18,9 @@
 | 1.3 | GET/POST/PATCH/DELETE /garments with filters and cursor pagination | **Done** |
 | 1.4 | Closet grid: two columns, FlashList, skeletons, empty state | **Written, not visually verified** (B-2) |
 | 1.5 | Garment detail (SSENSE reference) | **Written, not visually verified** (B-2) |
-| 1.6 | Manual add + edit | **Not started** — API is ready; the form is not built |
-| 1.7 | Favourite, status change, archive — optimistic with undo | **Partial** — favourite and status are optimistic; the undo snackbar is not built |
-| 1.8 | Category chips + filter sheet with live count | **Partial** — chips done, `/garments/count` done; the filter sheet is not built |
+| 1.6 | Manual add + edit | **Done** (code); not visually verified (B-2) |
+| 1.7 | Favourite, status change, archive — optimistic with undo | **Partial** — favourite and status are optimistic; the undo snackbar is still to build |
+| 1.8 | Category chips + filter sheet with live count | **Done** (code); not visually verified (B-2) |
 
 ### Exit criteria
 
@@ -28,7 +29,7 @@
       is p95 < 6 ms against the 227-garment seed.
 - [x] Every state from `states-and-errors.md` implemented on Closet and Detail —
       loading, empty, filtered-empty, error, offline and not-found are all
-      implemented. Not yet *seen*.
+      implemented, on the grid, detail, add and edit screens. Not yet *seen*.
 - [ ] **VoiceOver pass on both screens** — blocked on B-2.
 
 ## Blocked
@@ -51,11 +52,16 @@ npm run mobile   # then press i
 
 ## Next
 
-1. Clear B-2 and verify the Closet and Garment detail screens visually and with
-   VoiceOver.
-2. 1.6 — manual add and edit form.
-3. 1.8 — the filter sheet, wired to the live count endpoint that already exists.
-4. 1.7 — the undo snackbar for archive and status changes.
+1. Clear B-2 and verify Closet, Garment detail, the add/edit form and the filter
+   sheet visually and with VoiceOver.
+2. 1.7 — the undo snackbar for archive and status changes. This is the only
+   remaining code gap in Phase 1.
+
+Everything in 1.6 and 1.8 was verified against the running API: creating a
+garment from the exact payload the form emits, editing it, the server rejecting
+`source_type` with `immutable_field`, rejecting `dresses/heels` with
+`subcategory_mismatch`, and every filter combination's live count matching its
+actual result set (including multi-value OR and explicit laundry).
 
 ## Local setup
 

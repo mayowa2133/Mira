@@ -153,6 +153,14 @@ export default function GarmentDetailScreen() {
               {g.status === 'laundry' ? 'Back in the closet' : 'In the laundry'}
             </Text>
           </Pressable>
+          <Pressable
+            style={styles.secondaryButton}
+            onPress={() => router.push(`/edit/${g.id}`)}
+            accessibilityRole="button"
+            accessibilityLabel="Edit this piece"
+          >
+            <Text style={styles.secondaryLabel}>Edit</Text>
+          </Pressable>
         </View>
 
         {g.status !== 'active' ? (

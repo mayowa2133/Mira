@@ -1,4 +1,5 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
 
@@ -18,11 +19,11 @@ const OPTIONS = [
   { icon: '✉️', label: 'Find online purchases', phase: 'Phase 8' },
   { icon: '🖼', label: 'Choose a photo', phase: 'Phase 2' },
   { icon: '🔗', label: 'Paste product link', phase: 'Phase 3' },
-  { icon: '✎', label: 'Add manually', phase: 'Next' },
 ];
 
 export default function AddScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   return (
     <ScrollView
@@ -41,12 +42,25 @@ export default function AddScreen() {
       </View>
 
       {OPTIONS.map((option) => (
-        <View key={option.label} style={styles.row} accessibilityRole="button">
+        <View key={option.label} style={styles.row}>
           <Text style={styles.rowIcon}>{option.icon}</Text>
           <Text style={styles.rowLabel}>{option.label}</Text>
           <Text style={styles.rowPending}>{option.phase}</Text>
         </View>
       ))}
+
+      {/* Manual entry is always LAST in the hierarchy: every option above it
+          exists to avoid it (docs/02-design/screen-specs.md §18). */}
+      <Pressable
+        style={styles.row}
+        onPress={() => router.push('/add/manual')}
+        accessibilityRole="button"
+        accessibilityLabel="Add manually"
+      >
+        <Text style={styles.rowIcon}>✎</Text>
+        <Text style={styles.rowLabel}>Add manually</Text>
+        <Text style={styles.rowChevron}>›</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -93,4 +107,5 @@ const styles = StyleSheet.create({
   rowIcon: { width: space.xxxl, fontSize: 18 },
   rowLabel: { flex: 1, fontSize: type.body.fontSize, color: color.text },
   rowPending: { fontSize: type.caption.fontSize, color: color.textTertiary },
+  rowChevron: { fontSize: 20, color: color.textSecondary },
 });

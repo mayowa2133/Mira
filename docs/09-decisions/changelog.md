@@ -169,3 +169,31 @@ Format: `## YYYY-MM-DD` then bullets grouped by area.
 
 - `FlashList` v2 measures items itself; `estimatedItemSize` no longer exists.
   `coding-standards.md` updated — it described the v1 API.
+
+## 2026-09-03 (Phase 1, continued) — Manual entry and filtering
+
+### Product
+
+- **1.6 Manual add and edit.** Only a category is required; everything else is
+  optional, because manual entry is the fallback path and Mira exists to remove
+  data entry rather than demand it (CAP-2). Choosing a category clears a
+  subcategory that no longer belongs to it, so the user can never construct
+  `dresses/heels` and meet a server error for something the UI allowed.
+  The edit form sends only changed fields and never `source_type` — provenance
+  is immutable (CAP-3).
+- **1.8 Filter sheet.** Category, colour, occasion, season and status, applying
+  on the CTA rather than on every tap, with a live "Show N pieces" count from
+  `/garments/count`. Applied filters remain visible above the grid as
+  dismissible chips, each removable in one tap. Colour swatches always carry
+  their name, so colour is never the only carrier of meaning (A11Y-4).
+
+### Engineering
+
+- Form state, serialization and filter state live in React-free modules
+  (`garment-form.ts`, `filter-state.ts`), so the rules that matter are testable
+  without a simulator. 41 tests cover them.
+- `apps/mobile` joined the vitest projects.
+- Two small correctness details worth naming: an un-ticked filter box omits its
+  parameter entirely rather than sending `false` (which would filter to the
+  *inverse* set), and `tags_attached` is sent as `null` rather than `false` when
+  unticked, because null means "unknown" while false asserts the tags are gone.
