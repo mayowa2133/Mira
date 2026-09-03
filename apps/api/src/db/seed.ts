@@ -21,6 +21,10 @@ import {
   type SeedGarment,
 } from './seed-garments.js';
 import { categoryRowId } from './sync-taxonomy.js';
+import { encodeBlurhash, imageHash, renderGarmentImage } from './seed-images.js';
+import { buildStorageKey, createLocalStorage } from '../lib/storage.js';
+import { resolveStorageRoot } from '../lib/storage-root.js';
+import { COLOR_SWATCHES, type Color } from '@mira/taxonomy';
 import { createLogger } from '../lib/logger.js';
 import { isEntrypoint } from '../lib/entrypoint.js';
 import { env } from '../config/env.js';
@@ -141,7 +145,16 @@ async function insertGarments(
   items: SeedGarment[],
   logger: ReturnType<typeof createLogger>,
 ): Promise<number> {
+  // Deleting the garments cascades their images away too, so a re-seed does not
+  // leave orphaned rows pointing at files it is about to overwrite.
   await pool.query('delete from garments where user_id = $1', [userId]);
+
+  const config = env();
+  const storage = createLocalStorage({
+    root: resolveStorageRoot(config.STORAGE_LOCAL_ROOT),
+    secret: config.STORAGE_SIGNING_SECRET,
+    publicBaseUrl: `${config.API_BASE_URL}/v1`,
+  });
 
   // Some brands are deliberately never promoted to the `brands` table, so the
   // brand_raw-only path stays exercised.
@@ -229,12 +242,55 @@ async function insertGarments(
          values ($2, $1, $3, 'seed')`,
         [userId, garmentId, item.sourceType],
       );
+
+      // Synthetic imagery, so the closet grid can be judged on the thing it
+      // exists to show (`docs/04-data/seed-data.md` — Images).
+      await attachSeedImage(pool, storage, userId, garmentId, item);
       inserted += 1;
     }
   }
 
   logger.info('garments seeded', { count: inserted, brands: brands.size });
   return inserted;
+}
+
+/**
+ * Draw and store a placeholder image for a seeded garment.
+ *
+ * Written through the same storage driver the API reads from, so the seeded
+ * closet exercises the real signed-URL path rather than a shortcut.
+ */
+async function attachSeedImage(
+  pool: ReturnType<typeof getPool>,
+  storage: ReturnType<typeof createLocalStorage>,
+  userId: string,
+  garmentId: string,
+  item: SeedGarment,
+): Promise<void> {
+  const swatch = COLOR_SWATCHES[item.primaryColor as Color] ?? '#9A9691';
+  const { png, width, height, pixels } = renderGarmentImage({
+    category: item.category,
+    colorHex: swatch,
+  });
+
+  const storageKey = buildStorageKey('garments', userId, garmentId, 'canonical.png');
+  await storage.put(storageKey, png);
+
+  await pool.query(
+    `insert into garment_images
+       (garment_id, user_id, kind, storage_key, width, height, blurhash, image_hash,
+        is_canonical, position)
+     values ($2, $1, 'canonical', $3, $4, $5, $6, $7, true, 0)`,
+    [
+      userId,
+      garmentId,
+      storageKey,
+      width,
+      height,
+      encodeBlurhash(pixels, width, height),
+      imageHash(png),
+    ],
+  );
 }
 
 if (isEntrypoint(import.meta.url)) {

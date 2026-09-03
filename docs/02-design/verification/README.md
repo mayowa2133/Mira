@@ -14,6 +14,10 @@ changes materially.
 | `02-closet.png` | Closet grid, 224 visible pieces | `screen-specs.md` §14, Reference 01 |
 | `03-detail.png` | Garment detail | `screen-specs.md` §17, Reference 02 |
 
+Garments carry generated placeholder imagery (see
+`docs/04-data/seed-data.md` — Images), so the grid can be judged on the thing it
+exists to show.
+
 ## What these confirm
 
 - Warm ivory ground, near-black text, blush selected-chip fill — the tokens
@@ -25,13 +29,18 @@ changes materially.
 - The header count matches the API (`224` visible = 227 seeded − 3 archived).
 - Garment detail reads as an editorial product page, not an inventory row.
 
+- **Imagery dominates the tile**, with metadata supporting it rather than
+  competing — the point of Reference 01, and not judgeable until there were
+  images.
+- Each silhouette matches its own metadata: the ivory dress reads ivory, the
+  light-blue leggings read light blue.
+
 ## What they do NOT yet show
 
-Garment imagery. The seed creates garments without images, because photo
-capture is Phase 2, so every tile renders its `surfaceSunken` placeholder. The
-layout is verified; the claim that "imagery dominates" cannot be until there are
-images. `docs/04-data/seed-data.md` calls for generated placeholder imagery —
-worth doing before the next visual pass.
+Real photography. These are drawn silhouettes, not photographs, so they verify
+layout, hierarchy and colour handling — not how the grid behaves with the
+varied crops, backgrounds and contrast of real garment photos. That arrives with
+photo capture in Phase 2.
 
 ## How to reproduce
 

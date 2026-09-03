@@ -56,6 +56,31 @@ Seeds use **synthetic or properly licensed placeholder imagery only**.
 - Placeholder garments are generated flat-lay renders on a neutral ground, which
   also exercise the cutout path.
 
+### How they are generated
+
+`apps/api/src/db/seed-images.ts` DRAWS them: a category silhouette in the
+garment's own taxonomy colour, on the `surfaceSunken` ground, at 640x800 (the
+4:5 tile ratio). Nothing is downloaded, so the seed stays legally clean and
+deterministic — the same seed produces the same closet, which is what makes
+screenshots and performance numbers comparable between runs.
+
+There is no image dependency. PNG is written directly (zlib ships with Node) and
+blurhash is a small, well-defined transform. A raster library to draw a dozen
+rectangles would not have earned its place.
+
+Each seeded garment gets one `canonical` image with real `width`, `height`,
+`blurhash` and `image_hash`, written through the same storage driver the API
+reads from — so the seeded closet exercises the real signed-URL path rather than
+a shortcut.
+
+Colours near the ground are darkened slightly before drawing. Without that, an
+ivory garment on an ivory ground is invisible, and roughly a fifth of the
+taxonomy palette is light.
+
+**These are placeholders, not photographs.** They verify layout, hierarchy and
+colour handling. They do not tell you how the grid behaves with the varied
+crops, backgrounds and contrast of real garment photos.
+
 ## `edge` set
 
 Deliberately awkward, because these are the cases that break screens:

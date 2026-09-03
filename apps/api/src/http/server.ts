@@ -23,6 +23,7 @@ import { GarmentRepository } from '../modules/closet/repository.js';
 import { IdentityRepository } from '../modules/identity/repository.js';
 import { getPool } from '../db/pool.js';
 import { createLocalStorage, type StorageDriver } from '../lib/storage.js';
+import { resolveStorageRoot } from '../lib/storage-root.js';
 
 export type BuildServerOptions = {
   env: Env;
@@ -134,8 +135,8 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
       const storage =
         options.storage ??
         createLocalStorage({
-          root: process.env['STORAGE_LOCAL_ROOT'] ?? '.mira-storage',
-          secret: process.env['STORAGE_SIGNING_SECRET'] ?? 'mira-local-storage-secret',
+          root: resolveStorageRoot(env.STORAGE_LOCAL_ROOT),
+          secret: env.STORAGE_SIGNING_SECRET,
           publicBaseUrl: `${env.API_BASE_URL}/v1`,
         });
 

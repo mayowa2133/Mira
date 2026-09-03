@@ -264,3 +264,41 @@ here — `simctl` has none, System Events needs Accessibility permission, and
 Seed garments have no images, so every tile shows its placeholder. The layout is
 verified; "imagery dominates" is not, and cannot be until the seed generates
 placeholder imagery as `seed-data.md` already calls for.
+
+## 2026-09-03 (Phase 1) — Seed imagery
+
+### Data
+
+- Seeded garments now carry generated placeholder imagery. Each gets one
+  `canonical` image with real dimensions, blurhash and image hash, written
+  through the same storage driver the API reads from — so the seeded closet
+  exercises the real signed-URL and progressive-load paths rather than a
+  shortcut.
+- Images are **drawn, not downloaded**: a category silhouette in the garment's
+  own taxonomy colour on the `surfaceSunken` ground. `seed-data.md` forbids
+  scraped retailer photography and reference screenshots, so generating them is
+  the only clean option — and it makes the seed deterministic, which is what
+  lets screenshots and performance numbers be compared between runs.
+- No image dependency: PNG is written directly and blurhash is a small
+  transform. A raster library to draw a dozen rectangles would not have earned
+  its place.
+
+### Fixed
+
+- **`STORAGE_LOCAL_ROOT` was resolved against the working directory.** The API
+  runs from `apps/api` and the seed from the repository root, so a relative
+  default silently gave them two different directories — the seed would write
+  images the server could never find. Relative roots now resolve against the API
+  package root.
+- **Blurhash ran on the full-size image**, which is O(width x height x
+  components) — about 6M iterations per garment, minutes across a 227-garment
+  seed, for a hash that only describes a blur. It now runs on a 32px
+  downsample: 7ms instead of seconds, with a visually identical result.
+
+### Design note
+
+The closet grid could not be judged against Reference 01 until it had imagery.
+With placeholders in place it reads as intended: the image dominates each tile
+and the metadata supports it. What is still unverified is how the grid handles
+REAL photography — varied crops, backgrounds and contrast — which arrives with
+photo capture in Phase 2.
