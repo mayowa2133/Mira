@@ -12,10 +12,17 @@ import { randomUUID } from 'node:crypto';
 import type { Env } from '../config/env.js';
 import { createLogger, type Logger } from '../lib/logger.js';
 import { ApiError, ErrorCode, internal } from './errors.js';
-import { bearerToken } from './auth.js';
+import { bearerToken, type UserResolver } from './auth.js';
 import type { TokenVerifier } from '../modules/identity/verify.js';
 import { registerHealthRoutes } from '../modules/health/routes.js';
 import { registerIdentityRoutes } from '../modules/identity/routes.js';
+import { registerClosetRoutes } from '../modules/closet/routes.js';
+import { registerMediaRoutes } from '../modules/media/routes.js';
+import { ClosetService } from '../modules/closet/service.js';
+import { GarmentRepository } from '../modules/closet/repository.js';
+import { IdentityRepository } from '../modules/identity/repository.js';
+import { getPool } from '../db/pool.js';
+import { createLocalStorage, type StorageDriver } from '../lib/storage.js';
 
 export type BuildServerOptions = {
   env: Env;
@@ -23,6 +30,10 @@ export type BuildServerOptions = {
   logger?: Logger;
   /** Injected for tests, so a health check can be simulated without a database. */
   checkDependencies?: () => Promise<{ database: boolean; queue: boolean; storage: boolean }>;
+  /** Injected for tests; defaults to the local filesystem driver. */
+  storage?: StorageDriver;
+  /** Injected for tests; defaults to resolving against the users table. */
+  userResolver?: UserResolver;
 };
 
 export async function buildServer(options: BuildServerOptions): Promise<FastifyInstance> {
@@ -50,11 +61,22 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
   // Resolves the actor when a token is present. Route guards decide whether an
   // actor is REQUIRED; this hook never rejects an anonymous request, so public
   // routes stay public.
+  const userResolver: UserResolver = options.userResolver ?? {
+    async resolve(providerSubject, email) {
+      const repo = new IdentityRepository(getPool());
+      const user = await repo.upsertByProviderId({ authProviderId: providerSubject, email });
+      if (user.deleted_at) throw new ApiError(401, ErrorCode.accountDeleted);
+      return { userId: user.id, providerSubject, email: user.email };
+    },
+  };
+
   app.addHook('onRequest', async (request) => {
     const token = bearerToken(request.headers.authorization);
     if (!token) return;
     const verified = await verifier.verify(token);
-    request.actor = { userId: verified.subject, email: verified.email };
+    // The provider subject is NOT a Mira user id. Resolve it here, once, so no
+    // downstream code can confuse the two (SEC-5, docs/05-api/auth-contract.md).
+    request.actor = await userResolver.resolve(verified.subject, verified.email);
   });
 
   // --- access log --------------------------------------------------------
@@ -108,6 +130,24 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
     async (instance) => {
       await registerHealthRoutes(instance, options);
       await registerIdentityRoutes(instance);
+
+      const storage =
+        options.storage ??
+        createLocalStorage({
+          root: process.env['STORAGE_LOCAL_ROOT'] ?? '.mira-storage',
+          secret: process.env['STORAGE_SIGNING_SECRET'] ?? 'mira-local-storage-secret',
+          publicBaseUrl: `${env.API_BASE_URL}/v1`,
+        });
+
+      const pool = getPool();
+      const garments = new GarmentRepository(pool);
+      const identity = new IdentityRepository(pool);
+
+      await registerClosetRoutes(instance, {
+        service: new ClosetService(garments, storage),
+        identity,
+      });
+      await registerMediaRoutes(instance, { storage });
     },
     { prefix: '/v1' },
   );

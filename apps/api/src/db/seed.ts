@@ -14,6 +14,13 @@
  *   npm run db:seed -- --set=minimal
  */
 import { getPool, closePool } from './pool.js';
+import {
+  UNMATCHED_BRANDS,
+  buildEdgeCases,
+  buildRealisticCloset,
+  type SeedGarment,
+} from './seed-garments.js';
+import { categoryRowId } from './sync-taxonomy.js';
 import { createLogger } from '../lib/logger.js';
 import { isEntrypoint } from '../lib/entrypoint.js';
 import { env } from '../config/env.js';
@@ -22,13 +29,18 @@ export const SEED_SETS = ['minimal', 'realistic', 'large', 'edge'] as const;
 export type SeedSet = (typeof SEED_SETS)[number];
 
 /** Seed users use @mira.local addresses and can never receive real email. */
+// Each set gets its own address: `users.email` is unique, and the upsert keys
+// on auth_provider_id, so two sets sharing an email collide on a constraint
+// neither of them keys against.
 const SEED_USERS: Record<SeedSet, { authProviderId: string; email: string; name: string }[]> = {
-  minimal: [{ authProviderId: 'seed-minimal-1', email: 'maya@mira.local', name: 'Maya' }],
-  realistic: [{ authProviderId: 'seed-realistic-1', email: 'maya@mira.local', name: 'Maya' }],
-  large: [{ authProviderId: 'seed-large-1', email: 'perf@mira.local', name: 'Perf' }],
+  minimal: [{ authProviderId: 'seed-minimal-1', email: 'maya+minimal@mira.local', name: 'Maya' }],
+  realistic: [
+    { authProviderId: 'seed-realistic-1', email: 'maya+realistic@mira.local', name: 'Maya' },
+  ],
+  large: [{ authProviderId: 'seed-large-1', email: 'perf+large@mira.local', name: 'Perf' }],
   edge: [
-    { authProviderId: 'seed-edge-empty', email: 'empty@mira.local', name: 'Empty closet' },
-    { authProviderId: 'seed-edge-single', email: 'single@mira.local', name: 'One piece' },
+    { authProviderId: 'seed-edge-empty', email: 'empty+edge@mira.local', name: 'Empty closet' },
+    { authProviderId: 'seed-edge-single', email: 'single+edge@mira.local', name: 'One piece' },
   ],
 };
 
@@ -74,15 +86,155 @@ export async function seed(set: SeedSet, logger = createLogger({ level: env().LO
     closets += closet.rowCount ?? 0;
   }
 
+  // Garments, for the sets that have them.
+  let garments = 0;
   if (set !== 'minimal') {
-    logger.warn('seed set not fully implemented yet', {
-      set,
-      note: 'garment seeding arrives with the Phase 1 schema (docs/08-engineering/implementation-plan.md)',
-    });
+    const primary = SEED_USERS[set][0];
+    if (!primary) throw new Error(`seed set ${set} declares no users`);
+
+    const { rows: userRows } = await pool.query<{ id: string }>(
+      'select id from users where auth_provider_id = $1',
+      [primary.authProviderId],
+    );
+    const userId = userRows[0]?.id;
+    if (!userId) throw new Error('seed user missing after upsert');
+
+    const { rows: closetRows } = await pool.query<{ id: string }>(
+      'select id from closets where user_id = $1 and is_default',
+      [userId],
+    );
+    const closetId = closetRows[0]?.id;
+    if (!closetId) throw new Error('seed closet missing after upsert');
+
+    const items =
+      set === 'edge'
+        ? buildEdgeCases()
+        : set === 'large'
+          ? [
+              ...buildRealisticCloset(1),
+              ...buildRealisticCloset(2),
+              ...buildRealisticCloset(3),
+              ...buildRealisticCloset(4),
+              ...buildRealisticCloset(5),
+              ...buildRealisticCloset(6),
+            ]
+          : buildRealisticCloset();
+
+    garments = await insertGarments(pool, userId, closetId, items, logger);
   }
 
-  logger.info('seed complete', { set, users, closets });
-  return { users, closets };
+  logger.info('seed complete', { set, users, closets, garments });
+  return { users, closets, garments };
+}
+
+/**
+ * Insert seed garments.
+ *
+ * Idempotent by construction: the whole seeded closet is cleared first, so
+ * re-running produces the same closet rather than doubling it
+ * (`docs/04-data/seed-data.md` — Rules).
+ */
+async function insertGarments(
+  pool: ReturnType<typeof getPool>,
+  userId: string,
+  closetId: string,
+  items: SeedGarment[],
+  logger: ReturnType<typeof createLogger>,
+): Promise<number> {
+  await pool.query('delete from garments where user_id = $1', [userId]);
+
+  // Some brands are deliberately never promoted to the `brands` table, so the
+  // brand_raw-only path stays exercised.
+  const unmatched = new Set<string>(UNMATCHED_BRANDS);
+
+  const brands = new Map<string, string>();
+  for (const item of items) {
+    if (!item.brandRaw || unmatched.has(item.brandRaw)) continue;
+    const normalized = item.brandRaw.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (!normalized || brands.has(normalized)) continue;
+    const { rows } = await pool.query<{ id: string }>(
+      `insert into brands (name, normalized_name) values ($1, $2)
+       on conflict (normalized_name) do update set name = brands.name
+       returning id`,
+      [item.brandRaw, normalized],
+    );
+    const id = rows[0]?.id;
+    if (id) brands.set(normalized, id);
+  }
+
+  let inserted = 0;
+  for (const item of items) {
+    const normalized = item.brandRaw?.toLowerCase().replace(/[^a-z0-9]+/g, '') ?? '';
+    const brandId = brands.get(normalized) ?? null;
+    const lastWorn =
+      item.lastWornDaysAgo === null
+        ? null
+        : new Date(Date.now() - item.lastWornDaysAgo * 86_400_000).toISOString();
+
+    const { rows } = await pool.query<{ id: string }>(
+      `insert into garments (
+         user_id, closet_id, name, brand_id, brand_raw, category, subcategory,
+         primary_color, secondary_colors, pattern, materials,
+         size_raw, size_normalized, size_system, fit,
+         season, occasion, style_tags,
+         purchase_date, purchase_price, currency, retailer,
+         source_type, status, favorite, tags_attached, notes,
+         worn_count, last_worn_at, analysis_state
+       ) values (
+         $1,$2,$3,$4,$5,$6,$7,
+         $8,$9,$10,$11,
+         $12,$13,$14,$15,
+         $16,$17,$18,
+         $19,$20,$21,$22,
+         $23,$24,$25,$26,$27,
+         $28,$29,'complete'
+       ) returning id`,
+      [
+        userId,
+        closetId,
+        item.name,
+        brandId,
+        item.brandRaw,
+        item.category,
+        categoryRowId(item.category, item.subcategory),
+        item.primaryColor,
+        item.secondaryColors,
+        item.pattern,
+        item.materials,
+        item.sizeRaw,
+        item.sizeNormalized,
+        item.sizeSystem,
+        item.fit,
+        item.season,
+        item.occasion,
+        item.styleTags,
+        item.purchaseDate,
+        item.purchasePrice,
+        item.currency,
+        item.retailer,
+        item.sourceType,
+        item.status,
+        item.favorite,
+        item.tagsAttached,
+        item.notes,
+        item.wornCount,
+        lastWorn,
+      ],
+    );
+
+    const garmentId = rows[0]?.id;
+    if (garmentId) {
+      await pool.query(
+        `insert into garment_sources (garment_id, user_id, source_type, reference_kind)
+         values ($2, $1, $3, 'seed')`,
+        [userId, garmentId, item.sourceType],
+      );
+      inserted += 1;
+    }
+  }
+
+  logger.info('garments seeded', { count: inserted, brands: brands.size });
+  return inserted;
 }
 
 if (isEntrypoint(import.meta.url)) {

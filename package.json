@@ -2,7 +2,7 @@
   "name": "mira",
   "private": true,
   "version": "0.0.0",
-  "description": "Mira — your closet, your stylist, your mirror.",
+  "description": "Mira \u2014 your closet, your stylist, your mirror.",
   "type": "module",
   "workspaces": [
     "apps/*",
@@ -28,8 +28,8 @@
     "worker": "npm run dev --workspace @mira/worker",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
-    "db:migrate": "npm run db:migrate --workspace @mira/api",
-    "db:seed": "npm run db:seed --workspace @mira/api",
+    "db:migrate": "npm run db:migrate --workspace @mira/api --",
+    "db:seed": "npm run db:seed --workspace @mira/api --",
     "clean": "npm run clean --workspaces --if-present && rm -rf node_modules"
   },
   "devDependencies": {

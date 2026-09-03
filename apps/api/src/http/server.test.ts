@@ -122,6 +122,59 @@ describe('authentication (docs/05-api/auth-contract.md)', () => {
   });
 });
 
+/**
+ * Regression: `actor.userId` must be the MIRA user id, never the identity
+ * provider's subject.
+ *
+ * These are different namespaces — the provider's subject is an opaque string,
+ * a Mira user id is a uuid — and every repository call is scoped by the latter
+ * (SEC-5, docs/05-api/auth-contract.md). Conflating them made every scoped
+ * query fail with `invalid input syntax for type uuid`, and would have been far
+ * worse had the column been text.
+ */
+describe('actor resolution (SEC-5)', () => {
+  const MIRA_ID = '99999999-9999-9999-9999-999999999999';
+
+  it('resolves the provider subject to a Mira user id before any route runs', async () => {
+    let seen: { userId: string; providerSubject: string } | null = null;
+
+    const server = await buildServer({
+      env: testEnv,
+      verifier: createDevVerifier(testEnv),
+      logger: createLogger({ level: 'fatal', sink: () => undefined }),
+      checkDependencies: async () => ({ database: true, queue: true, storage: true }),
+      userResolver: {
+        async resolve(providerSubject, email) {
+          return { userId: MIRA_ID, providerSubject, email };
+        },
+      },
+    });
+
+    server.get('/v1/__actor', async (request) => {
+      seen = {
+        userId: request.actor?.userId ?? '',
+        providerSubject: request.actor?.providerSubject ?? '',
+      };
+      return { ok: true };
+    });
+
+    const jwt = await signToken('provider-subject-not-a-uuid');
+    await server.inject({
+      method: 'GET',
+      url: '/v1/__actor',
+      headers: { authorization: `Bearer ${jwt}` },
+    });
+
+    expect(seen).not.toBeNull();
+    expect(seen!.userId).toBe(MIRA_ID);
+    expect(seen!.providerSubject).toBe('provider-subject-not-a-uuid');
+    // The two must never be the same value by accident.
+    expect(seen!.userId).not.toBe(seen!.providerSubject);
+
+    await server.close();
+  });
+});
+
 describe('error contract (docs/05-api/error-contract.md)', () => {
   it('returns the documented error shape', async () => {
     const res = await app.inject({ method: 'GET', url: '/v1/auth/me' });

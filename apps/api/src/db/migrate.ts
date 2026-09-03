@@ -12,10 +12,11 @@
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { getPool, closePool } from './pool.js';
+import { getPool, closePool, type Queryable } from './pool.js';
 import { createLogger } from '../lib/logger.js';
 import { isEntrypoint } from '../lib/entrypoint.js';
 import { packageRoot } from '../lib/package-root.js';
+import { syncTaxonomy } from './sync-taxonomy.js';
 import { env } from '../config/env.js';
 
 // SQL migrations are source, not build output: `tsc` does not copy them, so
@@ -84,6 +85,11 @@ export async function migrate(logger = createLogger({ level: env().LOG_LEVEL }))
         );
       }
     }
+
+    // Reference data derived from the canonical taxonomy. Runs on every
+    // migrate, because garments.category has a foreign key to it.
+    const taxonomy = await syncTaxonomy(client as unknown as Queryable);
+    logger.info('taxonomy synced', taxonomy);
 
     logger.info('migrations complete', { applied, total: loadMigrations().length });
     return applied;

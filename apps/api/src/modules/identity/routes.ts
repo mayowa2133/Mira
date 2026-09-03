@@ -11,22 +11,15 @@ import { ApiError, ErrorCode } from '../../http/errors.js';
 
 export async function registerIdentityRoutes(app: FastifyInstance): Promise<void> {
   app.get('/auth/me', { onRequest: requireAuth }, async (request) => {
+    // The auth hook has already resolved the provider subject to a Mira user.
     const actor = requireActor(request);
     const scope = requireScope(request);
     const repo = new IdentityRepository(getPool());
 
-    // The verified subject is the provider's id; upsert resolves it to a Mira
-    // user and guarantees a default closet exists.
-    const user = await repo.upsertByProviderId({
-      authProviderId: actor.userId,
-      email: actor.email,
-    });
-    if (user.deleted_at) throw new ApiError(401, ErrorCode.accountDeleted);
+    const user = await repo.findById(actor.userId);
+    if (!user) throw new ApiError(401, ErrorCode.accountDeleted);
 
-    const userScopeForRow = { ...scope, userId: user.id } as typeof scope;
-    const closet =
-      (await repo.findDefaultCloset(userScopeForRow)) ??
-      (await repo.createDefaultCloset(userScopeForRow));
+    const closet = (await repo.findDefaultCloset(scope)) ?? (await repo.createDefaultCloset(scope));
 
     return {
       id: user.id,

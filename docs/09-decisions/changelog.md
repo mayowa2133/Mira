@@ -117,3 +117,55 @@ Format: `## YYYY-MM-DD` then bullets grouped by area.
   among its columns, because it has no WHERE clause to filter on. It still
   rejects an ownerless INSERT and still requires a predicate on the SELECT side
   of an `INSERT ... SELECT`.
+
+## 2026-09-03 (Phase 1) — Closet core
+
+### Data
+
+- Migration `0002_closet_core` — garments, garment_images, garment_attributes,
+  garment_sources, garment_embeddings, garment_duplicates, brands, categories,
+  with indexes, check constraints and RLS on every user-owned table.
+- Migration `0003_provenance_append_only` — corrected the `garment_sources`
+  trigger. 0002 blocked UPDATE *and* DELETE, which also blocked the cascade from
+  `garments` and made deleting a garment impossible. The rule in
+  `database-schema.md` is "never updated, never deleted **while the garment
+  lives**", so UPDATE is blocked and deletion is governed by the foreign key.
+- `categories` is synced from the canonical taxonomy on every `db:migrate`.
+  It is reference data, not sample data: `garments.category` has a foreign key
+  to it, so a migrated-but-unseeded database could otherwise hold no garments.
+- `realistic` seed set: 227 garments (220 + 3 genuine duplicates + 4
+  near-duplicates), 24 resolved brands, 33 brand_raw-only pieces, 53 never worn,
+  11 with tags attached, 19 forgotten, and every source type represented.
+
+### API
+
+- `GET /closet`, `GET/POST/PATCH/DELETE /garments`, `/garments/count`,
+  `/garments/:id/favorite`, `/garments/:id/status`, `/garments/:id/restore`,
+  `POST /media/upload-url`, and signed private media reads.
+- Keyset pagination throughout. Measured p95 under 6 ms for every list, filter
+  and sort against the 227-garment closet.
+
+### Fixes
+
+- **Actor resolution.** `actor.userId` held the identity provider's *subject*,
+  not the Mira `users.id`, so every scoped query received a non-uuid. The
+  subject is now resolved to a Mira user in the auth layer, exactly as
+  `auth-contract.md` specifies, and `providerSubject` is a separate field so the
+  two can never be confused again.
+- **Cursor precision.** Pagination round-tripped a `timestamptz` through a JS
+  `Date`, truncating Postgres microseconds to milliseconds. Rows inside the lost
+  window were silently skipped — 2 of 223 on the seeded closet. Cursor keys are
+  now taken as text straight from Postgres.
+- **Count/list divergence.** `GET /garments/count` did not apply the same
+  default visibility as `GET /garments`, so the filter sheet's "Show N items"
+  CTA would have promised more than the grid delivered. Both now share one
+  `applyDefaults`.
+- **Storage filename sanitizer** produced keys its own validator rejected
+  (`.._.._evil.jpg`), making those upload targets unusable.
+- **Seed arguments** were swallowed twice: npm cannot forward `-- args` through
+  a `&&`-chained script, nor through a nested `npm run` without a trailing `--`.
+
+### Engineering
+
+- `FlashList` v2 measures items itself; `estimatedItemSize` no longer exists.
+  `coding-standards.md` updated — it described the v1 API.

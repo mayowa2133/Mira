@@ -9,9 +9,11 @@
     "build": "tsc -b",
     "start": "node dist/index.js",
     "test": "vitest run",
-    "db:migrate": "tsc -b && node dist/db/migrate.js",
-    "db:seed": "tsc -b && node dist/db/seed.js",
-    "clean": "rm -rf dist *.tsbuildinfo"
+    "db:migrate": "node dist/db/migrate.js",
+    "db:seed": "node dist/db/seed.js",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "predb:migrate": "tsc -b",
+    "predb:seed": "tsc -b"
   },
   "dependencies": {
     "@mira/ai": "*",

@@ -18,6 +18,7 @@ const EnvSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(4000),
   API_HOST: z.string().default('0.0.0.0'),
   API_CORS_ORIGINS: z.string().default(''),
+  API_BASE_URL: z.string().default('http://localhost:4000'),
 
   DATABASE_URL: z.string().default('postgresql://mira:mira@localhost:5433/mira'),
   DATABASE_POOL_MAX: z.coerce.number().int().positive().default(10),
@@ -39,6 +40,10 @@ const EnvSchema = z.object({
   AI_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
 
   REDIS_URL: z.string().default('redis://localhost:6380'),
+
+  // Private object storage. No public bucket exists (SEC-4).
+  STORAGE_LOCAL_ROOT: z.string().default('.mira-storage'),
+  STORAGE_SIGNING_SECRET: z.string().default('mira-local-storage-secret'),
 
   SENTRY_DSN: z.string().optional(),
   POSTHOG_API_KEY: z.string().optional(),

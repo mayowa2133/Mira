@@ -12,7 +12,29 @@ import type { UserScope } from '../db/scope.js';
 import { userScope } from '../db/scope.js';
 import { ApiError, ErrorCode } from './errors.js';
 
-export type Actor = { userId: string; email: string | null };
+/**
+ * The authenticated actor.
+ *
+ * `userId` is the MIRA user id (a uuid), not the identity provider's subject.
+ * `docs/05-api/auth-contract.md` — "Verification on every request":
+ *
+ *   3. the subject resolves to a Mira user_id
+ *   4. that user_id is passed into every repository call (SEC-5)
+ *
+ * Keeping the provider subject in a separate field means a repository can never
+ * be handed one by mistake: they are different types of thing with different
+ * names, and only `userId` is accepted by `userScope`.
+ */
+export type Actor = {
+  userId: string;
+  providerSubject: string;
+  email: string | null;
+};
+
+/** Resolves a verified provider subject to a Mira user. */
+export interface UserResolver {
+  resolve(providerSubject: string, email: string | null): Promise<Actor>;
+}
 
 declare module 'fastify' {
   interface FastifyRequest {
