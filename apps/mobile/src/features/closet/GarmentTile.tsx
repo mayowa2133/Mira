@@ -1,5 +1,11 @@
 import { memo, useCallback } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type AccessibilityActionEvent,
+} from 'react-native';
 import { Image } from 'expo-image';
 import { color, layout, radius, space, type } from '@mira/ui';
 import type { Garment } from './queries';
@@ -53,12 +59,31 @@ function GarmentTileComponent({ garment, onPress, onToggleFavorite }: GarmentTil
     .filter(Boolean)
     .join(', ');
 
+  // The tile is one accessibility element, which means iOS folds the favourite
+  // button inside it into the tile and a screen reader can never reach it. The
+  // state is audible (the label ends "Favourited") but the CONTROL is not, so
+  // favouriting from the grid is impossible with VoiceOver on.
+  //
+  // A custom action is how iOS exposes a secondary control inside a cell
+  // without shattering the cell into fragments — the same mechanism Mail uses
+  // for archive/delete on a message row.
+  const favoriteActionLabel = garment.favorite ? 'Remove from favourites' : 'Favourite';
+
+  const handleAccessibilityAction = useCallback(
+    (event: AccessibilityActionEvent) => {
+      if (event.nativeEvent.actionName === 'favorite') handleFavorite();
+    },
+    [handleFavorite],
+  );
+
   return (
     <Pressable
       style={styles.root}
       onPress={handlePress}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityActions={[{ name: 'favorite', label: favoriteActionLabel }]}
+      onAccessibilityAction={handleAccessibilityAction}
     >
       <View style={styles.imageWrap}>
         {garment.canonical_image ? (
@@ -84,9 +109,11 @@ function GarmentTileComponent({ garment, onPress, onToggleFavorite }: GarmentTil
           style={styles.favorite}
           onPress={handleFavorite}
           hitSlop={space.md}
-          accessibilityRole="switch"
-          accessibilityState={{ checked: garment.favorite }}
-          accessibilityLabel={garment.favorite ? 'Remove from favourites' : 'Favourite'}
+          // Reached via the tile's `favorite` custom action, not as a separate
+          // element — leaving it accessible here would either be swallowed
+          // silently or split the tile into fragments.
+          accessible={false}
+          importantForAccessibility="no"
         >
           <Text style={[styles.heart, garment.favorite && styles.heartOn]}>
             {garment.favorite ? '♥' : '♡'}

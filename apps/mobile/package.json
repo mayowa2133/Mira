@@ -9,7 +9,8 @@
     "android": "expo run:android",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "clean": "rm -rf .expo dist"
+    "clean": "rm -rf .expo dist",
+    "test:ui": "./scripts/run-ui-tests.sh"
   },
   "dependencies": {
     "@mira/taxonomy": "*",

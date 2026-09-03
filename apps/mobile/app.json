@@ -35,6 +35,9 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-router", "expo-image"]
+    "plugins": [
+      "expo-router",
+      "./plugins/withUITestTarget"
+    ]
   }
 }

@@ -22,18 +22,28 @@ which is blocked on B-2.
 | 1.4 | Closet grid: two columns, FlashList, skeletons, empty state | **Done** — verified on device |
 | 1.5 | Garment detail (SSENSE reference) | **Done** — verified on device |
 | 1.6 | Manual add + edit | **Done** — add form verified on device; edit shares the same component |
-| 1.7 | Favourite, status change, archive — optimistic with undo | **Done** (code); the snackbar needs a tap to see (B-4) |
-| 1.8 | Category chips + filter sheet with live count | **Chips verified on device**; the sheet needs a tap (B-4) |
+| 1.7 | Favourite, status change, archive — optimistic with undo | **Done** — favourite verified under XCUITest |
+| 1.8 | Category chips + filter sheet with live count | **Done** — sheet, live count and applied chips verified under XCUITest |
 
 ### Exit criteria
 
-- [ ] **220-garment seed closet scrolls at 60 fps** — the closet renders with
-      227 seeded garments and imagery, but measuring scroll needs a gesture (B-4).
+- [ ] **220-garment seed closet scrolls at 60 fps** — partially verified.
+      `ClosetScrollTests` now flicks the real grid and harvests the
+      `Scroll_Deceleration` signpost: 2.430 s, relative standard deviation
+      0.284% over five passes. That is a **duration**, not a frame rate — it
+      is a regression baseline (a stall lengthens it), not proof of 60 fps.
+      A true frame-rate check needs an animation hitch metric; until then
+      this criterion stays open.
 - [x] Every state from `states-and-errors.md` implemented on Closet and Detail —
       loading, empty, filtered-empty, error, offline and not-found are all
       implemented. The empty and populated states have now been seen; the
       error, offline and filtered-empty states have not.
-- [ ] **VoiceOver pass on both screens** — blocked on B-4.
+- [x] **VoiceOver pass on both screens** — `performAccessibilityAudit` runs on
+      the closet, garment detail, the add menu and the filter sheet, covering
+      contrast, element detection, hit regions, element descriptions, clipped
+      text and traits. All pass. It found a real defect (see D-016). The
+      human rotor pass in `accessibility.md` §10 still stands as a release
+      ritual — an audit cannot hear whether a screen makes sense.
 
 ## Blocked
 
@@ -65,26 +75,34 @@ then renders (`docs/02-design/verification/04-add-manual.png`).
 Worth remembering: a verification tool that fails quietly will be mistaken for
 the thing it is verifying.
 
-### B-4 — Gestures cannot be automated here
+### ~~B-4 — Gestures cannot be automated here~~ — CLEARED 2026-09-03
 
-Still outstanding, all for the same reason — no way to tap or swipe:
+An XCUITest target (`apps/mobile/e2e/`) now drives real taps, swipes and flicks
+against the running app. It is injected by a config plugin
+(`plugins/withUITestTarget.js`) so it survives `expo prebuild` regenerating
+`ios/`.
 
-- **The filter sheet** has not been opened. It is state, not a route, so the
-  dev-route harness cannot reach it. Its contents are indirectly verified: the
-  same `ColorSelect` and `ChipMultiSelect` controls render correctly in the add
-  form. What is unverified is the modal presentation and the sticky live-count
-  CTA.
-- **60 fps on the 227-garment closet** needs a scroll gesture. The API side is
-  fast — every list, filter and sort query is p95 < 6 ms.
-- **VoiceOver pass.** Labels, roles and states are written throughout and the
-  contrast is asserted in CI, but no screen has been navigated with the screen
-  reader.
+13 tests: accessibility audits on four screens, filter-sheet behaviour, scroll
+paging, grid columns, and a hierarchy dump for diagnosis.
 
-`simctl` has no tap command, System Events needs Accessibility permission that
-cannot be granted from here, and `idb`'s taps did not register against this
-simulator. Clearing this properly means either a person driving it or an
-XCUITest target — the latter would also give the scroll measurement and an
-automatable accessibility-tree dump.
+It earned its place immediately by finding a defect nothing else could:
+**the favourite control on a closet tile was unreachable with VoiceOver.**
+Because the tile is one accessibility element (as `accessibility.md` §4
+requires), iOS folded the nested favourite `Pressable` into it. Touch worked, so
+the bug was invisible without a screen reader. Fixed as a custom action (D-016).
+
+Two lessons worth keeping:
+
+- The first version of the suite was **vacuous**. `garmentTiles` matched "any
+  button whose label contains a comma", and React Navigation labels its tab
+  buttons "Closet, tab, 2 of 5" — so the query returned five tabs on every
+  screen and the tile assertions passed with no garments rendered. `closetGrid`
+  was `scrollViews.firstMatch`, which is the horizontal category chip row, so
+  the scroll test was flicking the wrong view.
+- A metric can fail loudly for the wrong reason. `scrollDecelerationMetric`
+  threw `Invalid parameter not satisfying: _data` because `stopMeasuring()` was
+  called the moment the flick gesture returned — deceleration happens after
+  that, so no signpost ever landed in the window.
 
 ## Next
 

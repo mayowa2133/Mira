@@ -112,12 +112,22 @@ Haptics reinforce, never replace, a visual or audible signal.
 
 | Check | How |
 | ----- | --- |
-| Contrast | Automated token-pair test in CI |
-| Labels | Snapshot of the accessibility tree per screen |
+| Contrast (tokens) | Automated token-pair test in CI |
+| Contrast (rendered) | `performAccessibilityAudit()` in XCUITest |
+| Labels | `performAccessibilityAudit()`, plus explicit assertions that a garment tile reads as one description rather than four fragments |
+| Hit regions | `performAccessibilityAudit()` — catches anything under 44pt |
+| Clipped text | `performAccessibilityAudit()` at large Dynamic Type |
+| Traits and state | Asserted directly: the favourite control is a toggle that reports its state |
 | Dynamic Type | Screenshot tests at default and largest sizes |
 | VoiceOver flow | Manual pass on the eight critical journeys, per release |
 | Reduced motion | Manual pass with the setting enabled |
 | Colour-only meaning | Manual review at design sign-off |
+
+The audit runs on every change and catches the failures a human is bad at
+spotting — one control out of forty losing its label. It does not replace a
+person listening to VoiceOver read a screen aloud, which is the only way to
+judge whether what it says is any *good*. Both are needed; only one can be
+automated.
 
 An accessibility pass is part of
 `docs/08-engineering/definition-of-done.md`. A screen that has not been navigated

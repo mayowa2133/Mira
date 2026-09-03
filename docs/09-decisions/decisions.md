@@ -177,3 +177,25 @@ Format:
   advisory still fails the build. Revisit when expo-router ships updated
   navigation dependencies; if Mira starts accepting untrusted deep links before
   then, re-evaluate immediately.
+
+## D-016 — A secondary control inside a tile is an accessibility custom action
+
+- **Date:** 2026-09-03 · **Status:** Accepted
+- **Decision:** Where a tile is a single accessibility element, a secondary
+  control inside it (today: favourite on the closet tile) is exposed as an
+  `accessibilityAction` on the tile, not as a nested accessible element. The
+  inner `Pressable` is explicitly `accessible={false}`. State stays in the tile
+  label ("… , Favourited").
+- **Why:** `docs/02-design/accessibility.md` §4 requires a tile to read as one
+  garment rather than four fragments, so the tile sets its own label and role.
+  iOS then folds every descendant into that element — which silently made the
+  favourite button unreachable with VoiceOver while remaining tappable by touch.
+  A custom action is how iOS resolves exactly this tension (the mechanism behind
+  Mail's per-row archive/delete). Making the heart separately accessible would
+  fix reachability by breaking §4.
+- **Consequences:** XCUITest cannot enumerate custom actions, so the automated
+  check asserts the observable half — that no orphaned favourite toggle exists
+  on the grid and that favourite state reaches the tile label. That the action
+  is wired is a unit-test concern, and the rotor gesture itself stays on the
+  manual VoiceOver pass (`accessibility.md` §10). Any future in-tile control
+  follows this pattern.
