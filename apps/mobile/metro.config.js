@@ -16,7 +16,10 @@ config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(workspaceRoot, 'node_modules'),
 ];
-// Prefer the hoisted copy, so React is never duplicated.
-config.resolver.disableHierarchicalLookup = true;
+// NOTE: do NOT set `disableHierarchicalLookup`. It stops Metro walking into
+// nested node_modules, and npm workspaces legitimately nest packages that
+// cannot be hoisted — expo-router ships its own expo-glass-effect, which then
+// fails to resolve at runtime with "could not be found within the project".
+// That flag is for pnpm-style layouts, not this one.
 
 module.exports = config;

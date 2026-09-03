@@ -226,3 +226,41 @@ Format: `## YYYY-MM-DD` then bullets grouped by area.
 - Undo copy and reversal rules live in a React-free `undo.ts`, tested without a
   simulator — a snackbar that says the wrong thing is worse than none, because
   the user acts on it.
+
+## 2026-09-03 (Phase 1) — First run on a simulator
+
+Xcode arrived, so the closet screens were seen for the first time rather than
+only typechecked. Screenshots and notes: `docs/02-design/verification/`.
+
+### Verified on device
+
+Home, Closet and Garment detail render against the real stack — Postgres with
+the 227-garment seed, the API, and a debug build on an iPhone 17 Pro (iOS 26.5).
+Two columns, ivory ground, blush selected chip, three text lines per tile, and a
+header count matching the API exactly.
+
+### Fixed
+
+- **Metro could not resolve nested packages.** `metro.config.js` set
+  `disableHierarchicalLookup: true`, which stops Metro walking into nested
+  `node_modules`. `expo-router` ships its own `expo-glass-effect`, so the app
+  failed at runtime with "could not be found within the project". That flag
+  suits pnpm layouts, not npm workspaces.
+- **Expo Router typed routes disabled** (Q-17): `@expo/cli` hoists its own
+  `expo-router@6.0.24` while the app resolves `57.0.18`, and the type generator
+  loads the hoisted copy, which lacks `internal/routing`.
+
+### Known-unresolved
+
+`/add/manual` did not navigate under the dev-route harness while other routes
+did. It is recorded in `tasks/current.md` as **B-3** and deliberately NOT
+written up as a product bug: a harness limitation fits the evidence just as
+well, and settling it needs one manual tap. Automated tapping is unavailable
+here — `simctl` has none, System Events needs Accessibility permission, and
+`idb` taps did not register.
+
+### Also noted
+
+Seed garments have no images, so every tile shows its placeholder. The layout is
+verified; "imagery dominates" is not, and cannot be until the seed generates
+placeholder imagery as `seed-data.md` already calls for.

@@ -7,6 +7,7 @@ import { color } from '@mira/ui';
 import { ApiError } from '@/lib/api';
 import { SnackbarProvider } from '@/ui/Snackbar';
 import { bootstrapDevAuth } from '@/lib/dev-auth';
+import { useDevInitialRoute } from '@/lib/dev-route';
 
 // Development-only: real sign-in is task 0.5 and has no client yet. Inert in
 // any release build. See src/lib/dev-auth.ts.
@@ -46,6 +47,7 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <SnackbarProvider>
+          <DevRoute />
           <StatusBar style="dark" />
           <Stack
             screenOptions={{
@@ -62,4 +64,10 @@ export default function RootLayout() {
       </SafeAreaProvider>
     </QueryClientProvider>
   );
+}
+
+/** Development-only: see src/lib/dev-route.ts. Renders nothing. */
+function DevRoute() {
+  useDevInitialRoute();
+  return null;
 }

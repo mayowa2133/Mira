@@ -92,3 +92,13 @@ prominent, and offer an auto-delete preference.
 mid-contract?**
 *Needed by:* before Phase 3 ships to production. *Leaning:* provider becomes
 ineligible, capability falls back, and users are told if their data was affected.
+
+**Q-17. Can Expo Router typed routes be re-enabled?**
+`experiments.typedRoutes` crashes the dev server in this monorepo: `@expo/cli`
+depends on `expo-router@6.0.24`, which npm hoists to the workspace root, while
+the app itself correctly resolves `expo-router@57.0.18`. `@expo/router-server`
+then loads the hoisted copy and fails on `expo-router/internal/routing`, a
+subpath only the newer version exports. Disabled in `app.json` for now.
+*Needed by:* whenever route-type safety becomes worth the effort.
+*Resolve by:* re-testing after an Expo CLI release that aligns the two, or by
+pinning an npm `overrides` entry for `expo-router`.
