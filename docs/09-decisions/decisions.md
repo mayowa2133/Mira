@@ -161,3 +161,19 @@ Format:
   it propagates into search, insights and duplicate detection.
 - **Consequences:** Brand precision is weighted far above brand recall in
   evaluation. Many garments will have no brand, which is correct.
+
+## D-015 — Moderate transitive advisories under expo-router are accepted
+
+- **Date:** 2026-09-03 · **Status:** Accepted
+- **Decision:** CI gates `npm audit` at `--audit-level=high`. The 20 moderate
+  advisories in `expo-router`'s dependency tree (`@react-navigation/*` →
+  `query-string` → `decode-uri-component`, and `uuid`) are accepted for now.
+- **Why:** `npm audit fix --force` resolves them by **downgrading expo-router
+  from v6 to v5**, a breaking downgrade of the navigation layer. Trading a
+  current, supported router for a moderate denial-of-service advisory in a URL
+  parser — reached only through deep links we do not yet accept — is the worse
+  risk.
+- **Consequences:** the gate is `high`, not `moderate`, so a genuinely serious
+  advisory still fails the build. Revisit when expo-router ships updated
+  navigation dependencies; if Mira starts accepting untrusted deep links before
+  then, re-evaluate immediately.

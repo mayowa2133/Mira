@@ -12,18 +12,30 @@ Target: **WCAG 2.2 AA**, plus iOS platform conventions.
 
 | Pair | Ratio | Status |
 | ---- | ----- | ------ |
-| `text #171717` on `bg #FAF9F7` | 15.1:1 | Pass AAA |
-| `text #171717` on `surface #FFFFFF` | 16.4:1 | Pass AAA |
-| `textSecondary #77736F` on `bg #FAF9F7` | 4.6:1 | Pass AA (body) |
-| `textTertiary #A8A29C` on `bg #FAF9F7` | 2.5:1 | **Decorative / large only** |
-| `inverseText #FFFFFF` on `inverseBg #171717` | 16.4:1 | Pass AAA |
-| `accent #C98F8A` on `bg` | 2.8:1 | **Never for text.** Fills and icons only |
+| `text #171717` on `bg #FAF9F7` | 17.04:1 | Pass AAA |
+| `text #171717` on `surface #FFFFFF` | 17.93:1 | Pass AAA |
+| `text #171717` on `surfaceSunken #F5F3F0` | 16.19:1 | Pass AAA |
+| `text #171717` on `accentSoft #F3E7E4` | 14.82:1 | Pass AAA |
+| `textSecondary #76726E` on `bg #FAF9F7` | 4.53:1 | Pass AA |
+| `textSecondary #76726E` on `surface #FFFFFF` | 4.77:1 | Pass AA |
+| `textTertiary #A8A29C` on `bg #FAF9F7` | 2.40:1 | **Decorative only — never text** |
+| `inverseText #FFFFFF` on `inverseBg #171717` | 17.93:1 | Pass AAA |
+| `accent #C98F8A` on `bg` | 2.57:1 | **Never for text.** Fills and icons only |
+| `success #7D8F7B` on `bg` | 3.28:1 | **Never for text.** Fills and icons only |
+| `warning #C7994F` on `bg` | 2.46:1 | **Never for text.** Fills and icons only |
+| `danger #B4544B` on `bg` | 4.63:1 | Pass AA — the only status colour usable as text |
+
+These values are computed, not estimated. `packages/ui/src/tokens.contrast.test.ts`
+asserts every one of them in CI, so a palette change that breaks AA fails the
+build (A11Y-2).
 
 **Rules**
 
 - `textTertiary` is never used for information the user must read.
-- `accent` is never a text colour on a light background. Accent text sits on
-  `inverseBg`, or accent is used as a fill behind `text`.
+- `accent`, `success` and `warning` are never text colours on a light
+  background. They are fills, icons and indicators. Status text uses `text`,
+  with the status colour carried by an adjacent icon or fill (A11Y-4).
+  `danger` is the one status colour that passes AA as text.
 - Text over photography always sits on a scrim or a glass panel, and is verified
   against the darkest and lightest images in the set.
 

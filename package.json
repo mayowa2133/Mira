@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "description": "Mira — your closet, your stylist, your mirror.",
+  "type": "module",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -11,16 +12,36 @@
     "node": ">=20"
   },
   "scripts": {
+    "generate:taxonomy": "node scripts/generate-taxonomy.mjs",
+    "generate:taxonomy:check": "node scripts/generate-taxonomy.mjs --check",
+    "build": "tsc -b",
+    "typecheck": "npm run generate:taxonomy && tsc -b",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "verify": "npm run typecheck && npm run lint && npm run test",
     "mobile": "npm run start --workspace @mira/mobile",
     "api": "npm run dev --workspace @mira/api",
     "worker": "npm run dev --workspace @mira/worker",
-    "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
-    "test:e2e": "npm run test:e2e --workspaces --if-present",
-    "eval": "npm run eval --workspaces --if-present",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
     "db:migrate": "npm run db:migrate --workspace @mira/api",
     "db:seed": "npm run db:seed --workspace @mira/api",
-    "verify": "npm run typecheck && npm run lint && npm run test"
+    "clean": "npm run clean --workspaces --if-present && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^22.19.2",
+    "@types/pg": "^8.23.1",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^9.1.2",
+    "openapi-typescript": "^7.13.0",
+    "prettier": "^3.9.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.69.0",
+    "vitest": "^4.1.11"
   }
 }

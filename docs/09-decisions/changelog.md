@@ -69,3 +69,33 @@ Format: `## YYYY-MM-DD` then bullets grouped by area.
 - ADR 0001 — record architecture decisions.
 - ADR 0002 — provider-independent AI layer.
 - ADR 0003 — purchase candidates separate from garments.
+
+## 2026-09-03 (later) — Phase 0 scaffolding
+
+### Design
+
+- **Corrected a WCAG AA failure.** `color.textSecondary` was `#77736F`, which is
+  4.47:1 on the ivory ground — below the 4.5 required for body text, on the
+  token that carries garment metadata across the whole closet. Now `#76726E`
+  (4.53:1). The contrast table in `accessibility.md` held estimated ratios that
+  were several points off; it now holds computed values, asserted in CI by
+  `packages/ui/src/tokens.contrast.test.ts`.
+- Clarified that `success` and `warning`, like `accent`, are fills and icons
+  only — never text on a light ground. `danger` is the one status colour that
+  passes AA as text.
+
+### Engineering
+
+- Phase 0 scaffold landed: npm workspaces monorepo, four packages, three apps,
+  CI, and 204 tests. See `tasks/completed.md`.
+- `docs/` and `tasks/` are excluded from Prettier. They are hand-authored prose
+  containing deliberate ASCII wireframes and fenced value lists that the
+  taxonomy generator parses; reflowing them is both diff churn and a
+  correctness hazard.
+- The taxonomy generator now tolerates a blank line between a label and its
+  fenced block, so hand-editing the source cannot silently break generation.
+
+### Decisions
+
+- D-015 — moderate transitive advisories under `expo-router` are accepted; the
+  CI audit gate is `high`.

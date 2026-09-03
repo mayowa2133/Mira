@@ -1,0 +1,33 @@
+# Local development dependencies for Mira.
+# See docs/08-engineering/environments.md
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: mira-postgres
+    environment:
+      POSTGRES_USER: mira
+      POSTGRES_PASSWORD: mira
+      POSTGRES_DB: mira
+    ports:
+      - '5432:5432'
+    volumes:
+      - mira-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U mira -d mira']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: mira-redis
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  mira-pgdata:

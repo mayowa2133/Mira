@@ -1,0 +1,126 @@
+# Mira CI
+#
+# docs/08-engineering/testing-strategy.md — CI:
+#   typecheck · lint · unit · integration · api · database · security · build
+#
+# Security tests and redaction exist from Phase 0. They are not a later concern.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  verify:
+    name: Typecheck, lint, test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: mira
+          POSTGRES_PASSWORD: mira
+          POSTGRES_DB: mira
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U mira -d mira"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://mira:mira@localhost:5432/mira
+      MIRA_ENV: local
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Generated artefacts must match their sources. A taxonomy or OpenAPI edit
+      # that was not regenerated fails here rather than drifting silently.
+      - name: Generated files are up to date
+        run: |
+          npm run generate:taxonomy
+          npm run generate:api-types
+          git diff --exit-code -- packages/taxonomy/src/generated.ts packages/types/src/api.generated.ts \
+            || { echo "::error::Generated files are stale. Run 'npm run generate:taxonomy' and 'npm run generate:api-types'."; exit 1; }
+
+      - name: Typecheck
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Migrate
+        run: npm run db:migrate
+
+      - name: Test (unit, integration, api, database, security)
+        run: npm test
+
+      - name: Audit
+        run: npm audit --audit-level=high
+
+  contracts:
+    name: Contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+
+      - name: OpenAPI is valid
+        run: npx --yes @redocly/cli lint docs/05-api/openapi.yaml --format=stylish
+
+      # docs/07-security/security-rules.md — "No backend secret reaches the client".
+      # Only EXPO_PUBLIC_* may appear in the mobile bundle.
+      - name: No server secrets referenced from mobile source
+        run: node scripts/check-client-secrets.mjs
+
+  # A placeholder that makes the gate explicit rather than implicit. AI
+  # evaluation runs when AI files change, from Phase 3
+  # (docs/06-ai/evaluation.md — Regression policy).
+  ai-evaluation:
+    name: AI evaluation gates
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check whether AI files changed
+        id: changed
+        run: |
+          if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -qE '^(packages/ai/|docs/06-ai/|docs/04-data/taxonomy.md)'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Evaluation required
+        if: steps.changed.outputs.changed == 'true'
+        run: |
+          echo "AI files changed. Evaluation gates (docs/06-ai/evaluation.md):"
+          echo "  - hallucinated garment rate = 0.00"
+          echo "  - ineligible garment rate  = 0.00"
+          echo "  - try-on garment fidelity  >= 4.2"
+          echo "::notice::Evaluation harness lands in Phase 3; gates are not yet executable."

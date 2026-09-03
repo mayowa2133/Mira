@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Mira",
+    "slug": "mira",
+    "scheme": "mira",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FAF9F7"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.mira.ios",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Mira uses your camera to scan the clothes you already own.",
+        "NSPhotoLibraryUsageDescription": "Mira uses your photos to add clothes you already own.",
+        "NSFaceIDUsageDescription": "Mira uses Face ID to protect your body profile and try-ons."
+      }
+    },
+    "android": {
+      "package": "app.mira.android",
+      "adaptiveIcon": {
+        "backgroundColor": "#FAF9F7",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": { "favicon": "./assets/favicon.png" },
+    "plugins": ["expo-router"],
+    "experiments": { "typedRoutes": true }
+  }
+}

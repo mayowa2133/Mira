@@ -3,79 +3,79 @@
 **Phase:** 0 — Foundation
 **Updated:** 2026-09-03
 
-The specification set is complete. No application code exists yet.
+The specification set is complete and the Phase 0 scaffold is in place.
+`npm run verify` is green: typecheck, format, lint and 204 tests.
 
 ---
 
 ## In progress
 
-Nothing yet.
+Nothing. Phase 0 is complete except for the two items under **Blocked** below.
 
-## Ready to start
+## Done in this phase
 
-These are Phase 0 from `docs/08-engineering/implementation-plan.md`, in
-dependency order. Take the top one that is not claimed.
-
-### 0.1 — Monorepo scaffold
-Set up `apps/{mobile,api,worker}` and `packages/{types,taxonomy,ai,ui}` as npm
-workspaces. TypeScript strict everywhere. No feature code.
-**Done when:** `npm run typecheck` passes across all workspaces.
-
-### 0.2 — Expo app shell
-Expo Router with the five tabs from `docs/02-design/navigation.md`
-(Home · Closet · Mira · Looks · You). Empty screens.
-**Done when:** it boots on the iOS Simulator and the tab bar matches the spec.
-
-### 0.3 — API skeleton
-Route → validation → authorization → service → repository layering from
-`docs/03-architecture/backend-architecture.md`. One endpoint: `GET /health`.
-**Done when:** the layering is enforced by structure, and a repository method
-cannot be written without a `user_id` parameter.
-
-### 0.4 — Database foundation
-Postgres in Docker, forward-only migration runner, seed command.
-**Done when:** `npm run db:migrate && npm run db:seed -- --set=minimal` works from
-a clean checkout.
-
-### 0.5 — Authentication
-Apple, Google and email via the managed provider. Tokens in the keychain.
-Per-request verification resolving to a `user_id`.
-**Done when:** sign-in works on a device and `GET /auth/me` returns the user.
-
-### 0.6 — `packages/taxonomy`
-Generate the taxonomy package from `docs/04-data/taxonomy.md`. Types must be
-narrow enough that application code cannot widen them.
-**Done when:** a test asserting that an invalid category fails to typecheck passes.
-
-### 0.7 — `packages/ui` tokens
-Every token from `docs/02-design/design-system.md`. Button, Chip, Skeleton,
-EmptyState primitives.
-**Done when:** a lint rule rejects literal hex values in feature code.
-
-### 0.8 — Environments
-`local`, `dev`, `staging`, `production` per
-`docs/08-engineering/environments.md`, with stubbed AI providers locally.
-**Done when:** the app runs end to end locally with no real provider credentials.
-
-### 0.9 — CI
-typecheck · lint · unit · integration · api · database · security · build.
-**Done when:** the security suite includes the cross-user 404 test and the log
-redaction fixture test.
-
-### 0.10 — Analytics and error reporting
-PostHog and Sentry, **with redaction in place from the first commit** — not
-retrofitted.
-**Done when:** the redactor's fixture suite passes and no event carries user
-content.
-
----
+| # | Task | Exit criterion | Status |
+| - | ---- | -------------- | ------ |
+| 0.1 | Monorepo scaffold | `npm run typecheck` passes across all workspaces | **Met** |
+| 0.2 | Expo app shell | Boots on the iOS Simulator; tab bar matches the spec | **Partial** — see Blocked |
+| 0.3 | API skeleton | Layering enforced by structure; a repository method cannot be written without a `user_id` | **Met** |
+| 0.4 | Database foundation | `db:migrate && db:seed --set=minimal` works from a clean checkout | **Unverified** — see Blocked |
+| 0.5 | Authentication | Sign-in works on a device and `GET /auth/me` returns the user | **Partial** — see Blocked |
+| 0.6 | `packages/taxonomy` | A test asserting an invalid category fails to typecheck | **Met** |
+| 0.7 | `packages/ui` tokens | A lint rule rejects literal hex in feature code | **Met** |
+| 0.8 | Environments | Runs end to end locally with no real provider credentials | **Met** |
+| 0.9 | CI | Security suite includes the cross-user 404 test and the redaction fixture test | **Met** (workflow authored; not yet run on a remote) |
+| 0.10 | Analytics and error reporting | Redactor fixture suite passes; no event carries user content | **Met** |
 
 ## Blocked
 
-Nothing.
+### B-1 — Docker daemon unavailable on this machine
+
+`docker compose up` never completes: Docker Desktop launches, `docker ps`
+answers, but image pulls and `docker version` hang indefinitely. The registry is
+reachable (`registry-1.docker.io` returns 401 as expected), so this is a local
+Docker Desktop problem, not a network one.
+
+**Consequence.** These are written and typechecked but have never executed:
+
+- migration `0001_foundation.sql` against a real Postgres
+- `npm run db:seed -- --set=minimal`
+- `apps/api/src/db/integration.test.ts` — including the cross-user 404 test,
+  which is the one security test that needs a real database
+
+The integration tests skip with a warning when no database is reachable, so the
+suite is green — but green does not mean those assertions ran.
+
+**To unblock:** open Docker Desktop and complete its first-run setup, then:
+
+```bash
+npm run db:up && npm run db:migrate && npm run db:seed -- --set=minimal && npm test
+```
+
+CI runs Postgres as a service container, so these tests will execute there
+regardless.
+
+### B-2 — No iOS Simulator on this machine
+
+`xcode-select -p` points at `/Library/Developer/CommandLineTools`; full Xcode is
+not installed, so `simctl` does not exist. The Expo app typechecks and its
+routes match `docs/02-design/navigation.md`, but it has never been rendered.
+
+`AGENTS.md` requires visual verification in the iOS Simulator before a screen is
+considered complete, so **0.2 is not done** by Mira's own standard.
+
+**To unblock:** install Xcode, then `sudo xcode-select -s /Applications/Xcode.app`,
+then `npm run mobile` and press `i`.
+
+## Next
+
+Phase 1 — Closet core (`docs/08-engineering/implementation-plan.md`). Do not
+start it until B-1 and B-2 are cleared: Phase 1 is the garment schema and the
+closet grid, and neither can be verified without a database and a simulator.
 
 ## Notes
 
 - Read `AGENTS.md` before starting anything.
-- Phase 0 has no user-visible features. Resist adding one.
-- Security tests and redaction exist from Phase 0. They are not a later concern.
+- `npm run verify` runs typecheck + lint + test.
+- `npm run generate:taxonomy` and `npm run generate:api-types` regenerate the
+  two generated files. CI fails if they are stale.

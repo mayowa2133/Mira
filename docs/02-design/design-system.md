@@ -50,7 +50,7 @@ Warm, brief, second person, lowercase-friendly. "You haven't worn this in
 | `color.surface` | `#FFFFFF` | Cards, sheets, garment tiles. |
 | `color.surfaceSunken` | `#F5F3F0` | Image placeholders, skeletons, wells. |
 | `color.text` | `#171717` | Near-black. Primary text. |
-| `color.textSecondary` | `#77736F` | Warm grey. Secondary text, metadata. |
+| `color.textSecondary` | `#76726E` | Warm grey. Secondary text, metadata. |
 | `color.textTertiary` | `#A8A29C` | Hints, disabled, timestamps. |
 | `color.accent` | `#C98F8A` | Dusty rose. Mira's accent — used sparingly. |
 | `color.accentSoft` | `#F3E7E4` | Pale blush. Selected chips, soft backgrounds. |

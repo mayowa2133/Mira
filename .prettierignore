@@ -1,0 +1,17 @@
+node_modules
+dist
+build
+.expo
+coverage
+package-lock.json
+
+# Generated — regenerate, never format.
+packages/taxonomy/src/generated.ts
+packages/types/src/api.generated.ts
+
+# Canonical specifications are hand-authored prose containing deliberate ASCII
+# wireframes and fenced value lists that the taxonomy generator parses.
+# Reflowing them is both a diff-churn problem and a correctness problem.
+docs/
+tasks/
+*.md

@@ -5,6 +5,83 @@ anything learned that changed a specification.
 
 ---
 
+## 2026-09-03 — Phase 0 scaffolding
+
+**Phase:** 0 — Foundation
+
+npm workspaces monorepo on Node 22, TypeScript strict throughout.
+`npm run verify` green: typecheck, format, lint, 204 tests across 10 files.
+
+**Packages**
+
+- `@mira/taxonomy` — **generated** from `docs/04-data/taxonomy.md` (11
+  categories, 65 distinct subcategories, 32 colours, 19 closed value sets), plus
+  the clamp helpers that drop out-of-taxonomy AI output rather than coercing it.
+- `@mira/types` — **generated** from `docs/05-api/openapi.yaml` via
+  `openapi-typescript`, plus domain aliases and a `Result` type.
+- `@mira/ai` — capability interfaces (ADR 0002), Zod output contracts, the
+  parse → validate → clamp → normalize pipeline, and stub providers that
+  deliberately exercise the fallback paths.
+- `@mira/ui` — the full token set from `docs/02-design/design-system.md`, plus
+  WCAG contrast maths asserted in CI.
+
+**Apps**
+
+- `@mira/api` — Fastify, layered route → validation → authorization → service →
+  repository. Health and `/auth/me` routes, JWT verification (JWKS in
+  deployed environments, HS256 dev verifier locally), the error contract, a
+  forward-only migration runner with checksum drift detection, and the
+  `minimal` seed set.
+- `@mira/worker` — job contracts and a queue abstraction with idempotency,
+  backoff and dead-lettering. No queue dependency yet: there are no real jobs
+  until Phase 2, and an unused dependency is a cost.
+- `@mira/mobile` — Expo SDK 57 / RN 0.86 with expo-router, the five tabs from
+  `docs/02-design/navigation.md`, monorepo Metro config, and screens that read
+  tokens only.
+
+**Enforcement that is now structural rather than aspirational**
+
+- **INV-1** — `packages/taxonomy/src/type-tests.ts` makes widening the taxonomy
+  a compile error. Verified load-bearing: removing a `@ts-expect-error` fails
+  the build, and adding an unnecessary one also fails it.
+- **SEC-5** — `scopedQuery` refuses to run a statement against a user-owned
+  table without a `user_id` predicate. A repository method that cannot scope by
+  user genuinely cannot be written.
+- **SEC-2 / SEC-9** — every log line and analytics event passes through a
+  redactor that matches on key name, so a field added tomorrow is redacted
+  tomorrow. 49 fixture tests.
+- **AI-6** — `resolveCandidateIds` rejects any garment id the server did not
+  offer, so a hallucinated garment cannot reach a response.
+- **A11Y-2** — the palette is asserted against WCAG in CI.
+- **D-009 / design system** — ESLint rejects literal hex and rgba in feature
+  code. Verified the rule actually fires.
+
+**Two defects found and fixed**
+
+1. **`textSecondary` failed WCAG AA.** `#77736F` on the ivory ground computes to
+   4.47:1, below the 4.5 required for body text — and that token carries brand,
+   name and colour on every closet tile. Darkened one step to `#76726E`
+   (4.53:1 on ivory, 4.77:1 on white), which is visually indistinguishable.
+   The documented ratios in `accessibility.md` were estimates and were several
+   points off; they are now computed values, asserted in CI.
+2. **Prettier broke the taxonomy generator.** Reformatting
+   `docs/04-data/taxonomy.md` inserted a blank line between a label and its
+   fenced block, which the parser required to be adjacent. Fixed both ends:
+   `docs/` and `tasks/` are excluded from formatting (they are hand-authored
+   prose containing deliberate ASCII wireframes), and the parser now tolerates
+   the blank line.
+
+**Decisions recorded:** D-015 (moderate transitive advisories under
+`expo-router` are accepted; CI gates at high).
+
+**Not verified — see `tasks/current.md` Blocked.** The Docker daemon on this
+machine never became usable, so the migration, the seed and the database
+integration tests have never executed. No full Xcode, so the Expo app has never
+been rendered in a simulator. Both are environment problems, and both are
+recorded rather than papered over.
+
+---
+
 ## 2026-09-03 — Repository brain
 
 **Phase:** 0 (documentation)
