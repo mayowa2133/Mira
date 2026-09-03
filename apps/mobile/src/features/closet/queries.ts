@@ -181,11 +181,15 @@ export function useToggleFavorite() {
 }
 
 /**
- * Change status.
+ * Change status, optimistically.
  *
- * Optimistic, with the previous status returned so the caller can offer Undo
- * rather than a confirmation (`docs/02-design/states-and-errors.md` —
- * Destructive actions: undo, not confirm, wherever reversible).
+ * The status flips immediately and the previous value is captured, because
+ * "undo, not confirm" needs something to undo TO — and after the mutation the
+ * old value is gone (`docs/02-design/states-and-errors.md` — Destructive
+ * actions).
+ *
+ * A failure rolls back visibly rather than leaving the UI asserting a status
+ * the server never accepted.
  */
 export function useSetStatus() {
   const client = useQueryClient();
@@ -193,6 +197,43 @@ export function useSetStatus() {
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       request<Garment>(`/garments/${id}/status`, { method: 'POST', body: { status } }),
+
+    onMutate: async ({ id, status }) => {
+      await client.cancelQueries({ queryKey: ['garments'] });
+      await client.cancelQueries({ queryKey: closetKeys.garment(id) });
+
+      const previousLists = client.getQueriesData<GarmentPages>({ queryKey: ['garments'] });
+      const previousDetail = client.getQueryData<Garment>(closetKeys.garment(id));
+
+      // Captured before the write: this is what Undo restores.
+      const previousStatus =
+        previousDetail?.status ??
+        previousLists
+          .flatMap(([, data]) => data?.pages.flatMap((p) => p.data) ?? [])
+          .find((g) => g.id === id)?.status ??
+        null;
+
+      const patch = (g: Garment) => (g.id === id ? { ...g, status } : g);
+
+      for (const [key] of previousLists) {
+        client.setQueryData<GarmentPages>(key, (old) =>
+          old ? { ...old, pages: old.pages.map((p) => ({ ...p, data: p.data.map(patch) })) } : old,
+        );
+      }
+      if (previousDetail) {
+        client.setQueryData<Garment>(closetKeys.garment(id), { ...previousDetail, status });
+      }
+
+      return { previousLists, previousDetail, previousStatus, id };
+    },
+
+    onError: (_error, _vars, context) => {
+      for (const [key, data] of context?.previousLists ?? []) client.setQueryData(key, data);
+      if (context?.previousDetail) {
+        client.setQueryData(closetKeys.garment(context.id), context.previousDetail);
+      }
+    },
+
     onSettled: (_data, _error, { id }) => {
       void client.invalidateQueries({ queryKey: ['garments'] });
       void client.invalidateQueries({ queryKey: closetKeys.garment(id) });
@@ -201,7 +242,14 @@ export function useSetStatus() {
   });
 }
 
-/** Soft delete, paired with `useRestoreGarment` so removal is undoable. */
+/**
+ * Soft delete, paired with `useRestoreGarment` so removal is undoable.
+ *
+ * Removal is the one closet action that gets a CONFIRMATION rather than a bare
+ * undo, because it reads as deletion — but it is a soft delete recoverable for
+ * 30 days, and the confirmation says so
+ * (`docs/07-security/data-retention.md`).
+ */
 export function useRemoveGarment() {
   const client = useQueryClient();
   return useMutation({

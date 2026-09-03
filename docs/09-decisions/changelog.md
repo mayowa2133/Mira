@@ -197,3 +197,32 @@ Format: `## YYYY-MM-DD` then bullets grouped by area.
   parameter entirely rather than sending `false` (which would filter to the
   *inverse* set), and `tags_attached` is sent as `null` rather than `false` when
   unticked, because null means "unknown" while false asserts the tags are gone.
+
+## 2026-09-03 (Phase 1, continued) — Undo
+
+### Product
+
+- **1.7 Optimistic changes with undo.** Status changes are now optimistic and
+  capture the previous status before writing, because "undo, not confirm" needs
+  something to undo *to*. A snackbar offers `Undo` for six seconds; a failure
+  rolls back visibly rather than leaving the UI asserting a status the server
+  never accepted.
+- Archive and status changes get **undo**. Removal gets a **confirmation** that
+  names the piece and states it can be restored for 30 days — because
+  "deletion confirmations state exactly what is removed and whether it can be
+  recovered", and removal is a soft delete.
+- Archiving from the detail screen steps back to the closet: the piece is no
+  longer in the grid, so staying on a detail view the grid does not list would
+  be disorienting.
+
+### Engineering
+
+- `SnackbarProvider` sits above the navigator, so an undo survives the
+  navigation that accompanies the action it is undoing.
+- The snackbar respects `prefers-reduced-motion`: it keeps the duration and the
+  completion feedback, dropping only the movement (A11Y §6). It announces
+  politely rather than stealing focus.
+- Errors persist until dismissed; there is nothing to "wait out".
+- Undo copy and reversal rules live in a React-free `undo.ts`, tested without a
+  simulator — a snackbar that says the wrong thing is worse than none, because
+  the user acts on it.

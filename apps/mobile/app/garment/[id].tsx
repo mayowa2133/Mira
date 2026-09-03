@@ -1,12 +1,34 @@
 import { useCallback } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
 import { ApiError } from '@/lib/api';
 import { ClosetGridSkeleton, ClosetState } from '@/features/closet/ClosetGrid';
-import { useGarment, useSetStatus, useToggleFavorite } from '@/features/closet/queries';
+import {
+  useGarment,
+  useRemoveGarment,
+  useRestoreGarment,
+  useSetStatus,
+  useToggleFavorite,
+} from '@/features/closet/queries';
+import { useSnackbar } from '@/ui/Snackbar';
+import {
+  UNDO_DURATION_MS,
+  leavesTheCloset,
+  removalConfirmation,
+  statusChangeMessage,
+  undoForRemoval,
+} from '@/features/closet/undo';
 
 /**
  * Garment detail (`docs/02-design/screen-specs.md` §17, Reference 02 — SSENSE).
@@ -37,18 +59,119 @@ export default function GarmentDetailScreen() {
   const garment = useGarment(id ?? '');
   const toggleFavorite = useToggleFavorite();
   const setStatus = useSetStatus();
+  const removeGarment = useRemoveGarment();
+  const restoreGarment = useRestoreGarment();
+  const snackbar = useSnackbar();
 
   const handleFavorite = useCallback(() => {
     if (garment.data)
       toggleFavorite.mutate({ id: garment.data.id, favorite: !garment.data.favorite });
   }, [garment.data, toggleFavorite]);
 
+  /**
+   * Change status, then offer Undo.
+   *
+   * Reversible changes happen immediately and offer a way back, rather than
+   * interrupting with a dialog first (`docs/02-design/states-and-errors.md`).
+   */
+  const changeStatus = useCallback(
+    (next: string) => {
+      const current = garment.data;
+      if (!current) return;
+      const previous = current.status;
+
+      setStatus.mutate(
+        { id: current.id, status: next },
+        {
+          onSuccess: () => {
+            snackbar.show({
+              message: statusChangeMessage(next as never),
+              actionLabel: 'Undo',
+              durationMs: UNDO_DURATION_MS,
+              onAction: () => setStatus.mutate({ id: current.id, status: previous }),
+            });
+            // Archiving takes the piece out of the closet, so staying on a
+            // detail screen the grid no longer lists would be disorienting.
+            if (leavesTheCloset(next as never)) router.back();
+          },
+          onError: (error) => {
+            snackbar.show({
+              message: error instanceof ApiError ? error.message : "That didn't save.",
+              tone: 'error',
+            });
+          },
+        },
+      );
+    },
+    [garment.data, router, setStatus, snackbar],
+  );
+
   const handleLaundry = useCallback(() => {
     if (!garment.data) return;
     // A garment in the laundry is excluded from generated outfits (INV-2, D-012).
-    const next = garment.data.status === 'laundry' ? 'active' : 'laundry';
-    setStatus.mutate({ id: garment.data.id, status: next });
-  }, [garment.data, setStatus]);
+    changeStatus(garment.data.status === 'laundry' ? 'active' : 'laundry');
+  }, [changeStatus, garment.data]);
+
+  const handleArchive = useCallback(() => {
+    if (!garment.data) return;
+    changeStatus(garment.data.status === 'archived' ? 'active' : 'archived');
+  }, [changeStatus, garment.data]);
+
+  /**
+   * Remove, with a confirmation.
+   *
+   * Removal is the one closet action that CONFIRMS rather than simply offering
+   * undo, because it reads as deletion. The confirmation states exactly what
+   * happens and that it is recoverable, which the API guarantees for 30 days.
+   */
+  const handleRemove = useCallback(() => {
+    const current = garment.data;
+    if (!current) return;
+    const copy = removalConfirmation(current.name);
+
+    Alert.alert(copy.title, copy.body, [
+      { text: copy.cancelLabel, style: 'cancel' },
+      {
+        text: copy.confirmLabel,
+        style: 'destructive',
+        onPress: () => {
+          removeGarment.mutate(current.id, {
+            onSuccess: () => {
+              const undo = undoForRemoval();
+              router.back();
+              snackbar.show({
+                message: undo.message,
+                actionLabel: undo.actionLabel,
+                durationMs: UNDO_DURATION_MS,
+                onAction: () => restoreGarment.mutate(current.id),
+              });
+            },
+            onError: (error) => {
+              snackbar.show({
+                message: error instanceof ApiError ? error.message : "We couldn't remove that.",
+                tone: 'error',
+              });
+            },
+          });
+        },
+      },
+    ]);
+  }, [garment.data, removeGarment, restoreGarment, router, snackbar]);
+
+  const handleOverflow = useCallback(() => {
+    const current = garment.data;
+    if (!current) return;
+
+    // Edit is already a visible action below, so it is not repeated here.
+    Alert.alert(current.name ?? 'This piece', undefined, [
+      {
+        text: current.status === 'archived' ? 'Unarchive' : 'Archive',
+        onPress: handleArchive,
+      },
+      { text: 'Remove', style: 'destructive', onPress: handleRemove },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [garment.data, handleArchive, handleRemove]);
 
   if (garment.isPending) {
     return (
@@ -117,6 +240,16 @@ export default function GarmentDetailScreen() {
           hitSlop={space.md}
         >
           <Text style={styles.backGlyph}>←</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={handleOverflow}
+          style={[styles.overflow, { top: insets.top + space.sm }]}
+          accessibilityRole="button"
+          accessibilityLabel="More actions"
+          hitSlop={space.md}
+        >
+          <Text style={styles.backGlyph}>⋯</Text>
         </Pressable>
       </View>
 
@@ -233,6 +366,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backGlyph: { fontSize: 20, color: color.text },
+  overflow: {
+    position: 'absolute',
+    right: space.lg,
+    width: space.tapMin,
+    height: space.tapMin,
+    borderRadius: radius.full,
+    backgroundColor: color.glass,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: space.xxl },
   titleText: { flex: 1, paddingRight: space.lg },

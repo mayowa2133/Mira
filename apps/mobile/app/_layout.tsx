@@ -5,12 +5,17 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { color } from '@mira/ui';
 import { ApiError } from '@/lib/api';
+import { SnackbarProvider } from '@/ui/Snackbar';
 
 /**
  * Root layout.
  *
  * Onboarding is a separate root stack and is exited, not popped
  * (`docs/02-design/navigation.md` — Rules).
+ *
+ * The snackbar provider sits above the navigator so an undo survives the
+ * navigation that often accompanies the action it is undoing — archiving from
+ * the detail screen pops back to the closet, and the undo must still be there.
  */
 export default function RootLayout() {
   const [queryClient] = useState(
@@ -35,16 +40,20 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
-        <StatusBar style="dark" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: color.bg },
-          }}
-        >
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="garment/[id]" />
-        </Stack>
+        <SnackbarProvider>
+          <StatusBar style="dark" />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: color.bg },
+            }}
+          >
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="garment/[id]" />
+            <Stack.Screen name="add/manual" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="edit/[id]" options={{ presentation: 'modal' }} />
+          </Stack>
+        </SnackbarProvider>
       </SafeAreaProvider>
     </QueryClientProvider>
   );

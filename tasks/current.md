@@ -3,9 +3,12 @@
 **Phase:** 1 — Closet core (in progress)
 **Updated:** 2026-09-03
 
-`npm run verify` is green: typecheck, format, lint and **335 tests**, including
-33 integration tests against a real Postgres 16 + pgvector and 41 covering the
-React-free form and filter logic.
+`npm run verify` is green: typecheck, format, lint and **351 tests**, including
+33 integration tests against a real Postgres 16 + pgvector and 57 covering the
+React-free form, filter and undo logic.
+
+**Every Phase 1 task is code-complete.** What remains is visual verification,
+which is blocked on B-2.
 
 ---
 
@@ -19,7 +22,7 @@ React-free form and filter logic.
 | 1.4 | Closet grid: two columns, FlashList, skeletons, empty state | **Written, not visually verified** (B-2) |
 | 1.5 | Garment detail (SSENSE reference) | **Written, not visually verified** (B-2) |
 | 1.6 | Manual add + edit | **Done** (code); not visually verified (B-2) |
-| 1.7 | Favourite, status change, archive — optimistic with undo | **Partial** — favourite and status are optimistic; the undo snackbar is still to build |
+| 1.7 | Favourite, status change, archive — optimistic with undo | **Done** (code); not visually verified (B-2) |
 | 1.8 | Category chips + filter sheet with live count | **Done** (code); not visually verified (B-2) |
 
 ### Exit criteria
@@ -52,16 +55,22 @@ npm run mobile   # then press i
 
 ## Next
 
-1. Clear B-2 and verify Closet, Garment detail, the add/edit form and the filter
-   sheet visually and with VoiceOver.
-2. 1.7 — the undo snackbar for archive and status changes. This is the only
-   remaining code gap in Phase 1.
+**Clear B-2**, then verify all five closet screens visually and with VoiceOver.
+That is the only thing standing between Phase 1 and done.
 
-Everything in 1.6 and 1.8 was verified against the running API: creating a
-garment from the exact payload the form emits, editing it, the server rejecting
-`source_type` with `immutable_field`, rejecting `dresses/heels` with
-`subcategory_mismatch`, and every filter combination's live count matching its
-actual result set (including multi-value OR and explicit laundry).
+After that, Phase 2 — photo capture.
+
+Everything behavioural has been verified against the running API rather than
+only typechecked:
+
+- **1.6** — creating a garment from the exact payload the form emits, editing
+  it, `source_type` rejected with `immutable_field`, `dresses/heels` rejected
+  with `subcategory_mismatch`.
+- **1.8** — every filter combination's live count matching its actual result
+  set, including multi-value OR and explicit laundry.
+- **1.7** — the full undo round-trips: archive removes a piece from the closet
+  and undo returns it; laundry keeps it visible but out of outfits; remove
+  makes it 404 and restore brings it back with its status intact.
 
 ## Local setup
 
