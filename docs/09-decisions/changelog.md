@@ -302,3 +302,27 @@ With placeholders in place it reads as intended: the image dominates each tile
 and the metadata supports it. What is still unverified is how the grid handles
 REAL photography — varied crops, backgrounds and contrast — which arrives with
 photo capture in Phase 2.
+
+## 2026-09-03 (Phase 1) — Add form verified; B-3 was the harness, not the app
+
+`/add/manual` failing to navigate was **not** a routing defect. Tapping
+`+ Add → Add manually` by hand opens the form. The fault was
+`useDevInitialRoute`, which fired `router.replace` on a 400ms timer — that
+happened to work for routes declared as `<Stack.Screen>` and silently did
+nothing for nested ones.
+
+It now waits on `useRootNavigationState()`, which is the condition actually
+being waited on rather than a guess at how long mounting takes. The add form
+renders immediately afterwards.
+
+The lesson worth keeping: a verification tool that fails quietly gets mistaken
+for the thing it is verifying. The suspicion was recorded as unresolved rather
+than written up as a product bug, which is the only reason no one went looking
+for a defect that was never there.
+
+### Verified
+
+The manual add form (task 1.6): a category and nothing else required, and
+colour swatches carrying their names, so colour is never the only carrier of
+meaning (A11Y-4). The same controls back the filter sheet, so that sheet's
+contents are verified even though the sheet itself has not been opened.

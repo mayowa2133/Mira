@@ -21,19 +21,19 @@ which is blocked on B-2.
 | 1.3 | GET/POST/PATCH/DELETE /garments with filters and cursor pagination | **Done** |
 | 1.4 | Closet grid: two columns, FlashList, skeletons, empty state | **Done** — verified on device |
 | 1.5 | Garment detail (SSENSE reference) | **Done** — verified on device |
-| 1.6 | Manual add + edit | **Done** (code); not visually verified (B-3) |
-| 1.7 | Favourite, status change, archive — optimistic with undo | **Done** (code); not visually verified (B-3) |
-| 1.8 | Category chips + filter sheet with live count | **Chips verified on device**; the sheet needs a tap (B-3) |
+| 1.6 | Manual add + edit | **Done** — add form verified on device; edit shares the same component |
+| 1.7 | Favourite, status change, archive — optimistic with undo | **Done** (code); the snackbar needs a tap to see (B-4) |
+| 1.8 | Category chips + filter sheet with live count | **Chips verified on device**; the sheet needs a tap (B-4) |
 
 ### Exit criteria
 
 - [ ] **220-garment seed closet scrolls at 60 fps** — the closet renders with
-      227 seeded garments, but measuring scroll needs a gesture (B-3).
+      227 seeded garments and imagery, but measuring scroll needs a gesture (B-4).
 - [x] Every state from `states-and-errors.md` implemented on Closet and Detail —
       loading, empty, filtered-empty, error, offline and not-found are all
       implemented. The empty and populated states have now been seen; the
       error, offline and filtered-empty states have not.
-- [ ] **VoiceOver pass on both screens** — blocked on B-3.
+- [ ] **VoiceOver pass on both screens** — blocked on B-4.
 
 ## Blocked
 
@@ -53,35 +53,38 @@ installs and runs on an iPhone 17 Pro simulator against the real stack.
 
 **Not yet seen:** the add form, the edit form and the filter sheet. See B-3.
 
-### B-3 — Three screens still unverified, and one unexplained navigation result
+### ~~B-3 — /add/manual navigation~~ — RESOLVED 2026-09-03
 
-`/add/manual` did not navigate under the dev-route harness across several
-attempts, while `/closet` and `/garment/[id]` did. Two explanations fit equally
-well and I could not separate them without a real tap:
+Not a product bug. Tapping `+ Add → Add manually` by hand opens the form, so
+routing is fine. The fault was the verification harness: `useDevInitialRoute`
+fired `router.replace` on a 400ms timer, which worked for routes declared as
+`<Stack.Screen>` and silently did nothing for nested ones. It now waits on
+`useRootNavigationState()`, which is the actual condition — and the add form
+then renders (`docs/02-design/verification/04-add-manual.png`).
 
-1. a genuine routing defect, which would also break the "Add manually" row; or
-2. a limitation of the harness itself — `router.replace` fired from the root
-   layout before the navigator has registered nested routes.
+Worth remembering: a verification tool that fails quietly will be mistaken for
+the thing it is verifying.
 
-Removing the explicit `<Stack.Screen>` declarations did not change the result,
-so the simple explanation is ruled out. **Do not treat this as a confirmed
-product bug until it has been tapped through by hand.**
+### B-4 — Gestures cannot be automated here
 
-Automated tapping is also unavailable: `simctl` has no tap command, System
-Events needs Accessibility permission that cannot be granted from here, and
-`idb`'s taps did not register against this simulator.
+Still outstanding, all for the same reason — no way to tap or swipe:
 
-**To resolve:** open the app by hand, tap `+ Add → Add manually`, and see
-whether the form appears. That single tap settles it.
-
-### Also unverified
-
-- **60 fps on the 227-garment closet** — needs a scroll gesture, so it is
-  blocked on the same tapping problem. The API side is fast: every list, filter
-  and sort query is p95 < 6 ms.
+- **The filter sheet** has not been opened. It is state, not a route, so the
+  dev-route harness cannot reach it. Its contents are indirectly verified: the
+  same `ColorSelect` and `ChipMultiSelect` controls render correctly in the add
+  form. What is unverified is the modal presentation and the sticky live-count
+  CTA.
+- **60 fps on the 227-garment closet** needs a scroll gesture. The API side is
+  fast — every list, filter and sort query is p95 < 6 ms.
 - **VoiceOver pass.** Labels, roles and states are written throughout and the
   contrast is asserted in CI, but no screen has been navigated with the screen
-  reader. This needs either a person or an XCUITest target.
+  reader.
+
+`simctl` has no tap command, System Events needs Accessibility permission that
+cannot be granted from here, and `idb`'s taps did not register against this
+simulator. Clearing this properly means either a person driving it or an
+XCUITest target — the latter would also give the scroll measurement and an
+automatable accessibility-tree dump.
 
 ## Next
 

@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { useRouter } from 'expo-router';
+import { useEffect, useRef } from 'react';
+import { useRootNavigationState, useRouter } from 'expo-router';
 
 /**
  * Development-only initial-route override.
@@ -8,34 +8,38 @@ import { useRouter } from 'expo-router';
  * are the natural way, but iOS shows an "Open in Mira?" confirmation for custom
  * schemes opened from outside the app, and `simctl` cannot dismiss it.
  *
- * Setting `EXPO_PUBLIC_DEV_INITIAL_ROUTE` navigates there once on mount:
- *
  *   EXPO_PUBLIC_DEV_INITIAL_ROUTE=/closet npx expo start
+ *
+ * Waiting for the navigator, not for a timer: an earlier version fired
+ * `replace` on a 400ms timeout, which worked for routes declared as
+ * `<Stack.Screen>` and SILENTLY DID NOTHING for nested ones like
+ * `/add/manual`. That looked like a routing defect in the app for a while —
+ * it was this. `useRootNavigationState()` only has a `key` once the root
+ * navigator has mounted and registered its routes, which is the actual
+ * condition being waited on.
  *
  * SAFETY
  * - Gated on `__DEV__`, so it is inert in any release build.
- * - Runs exactly once, so it never fights real navigation.
+ * - Navigates exactly once, so it never fights real navigation.
  *
- * Delete this alongside `dev-auth.ts` once there is a sign-in flow and a
- * simulator-driving setup that can tap.
+ * Delete this alongside `dev-auth.ts` once there is a sign-in flow.
  */
 export function useDevInitialRoute(): void {
   const router = useRouter();
+  const rootState = useRootNavigationState();
+  const navigated = useRef(false);
 
   useEffect(() => {
     if (!__DEV__) return;
+    if (navigated.current) return;
+
+    // No key means the root navigator has not mounted yet.
+    if (!rootState?.key) return;
 
     const route = process.env.EXPO_PUBLIC_DEV_INITIAL_ROUTE;
     if (!route) return;
 
-    // Let the navigator mount before replacing, or the push is dropped.
-    const timer = setTimeout(() => {
-      router.replace(route as Parameters<typeof router.replace>[0]);
-    }, 400);
-
-    return () => clearTimeout(timer);
-    // Intentionally runs once: this is a launch affordance, not reactive state.
-    // (The react-hooks plugin is not configured in this repo, so no disable
-    // directive is needed — and an unknown one is itself a lint error.)
-  }, [router]);
+    navigated.current = true;
+    router.replace(route as Parameters<typeof router.replace>[0]);
+  }, [rootState?.key, router]);
 }
