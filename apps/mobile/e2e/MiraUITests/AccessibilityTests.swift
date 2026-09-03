@@ -72,10 +72,15 @@ final class AccessibilityTests: MiraUITestCase {
         for index in 0..<min(tiles.count, 6) {
             let label = tiles.element(boundBy: index).label
             XCTAssertFalse(label.isEmpty, "a garment tile has no accessibility label")
-            // Brand, name and colour · size are joined into one phrase.
+
+            // A garment straight off the camera has no brand, name or colour
+            // yet — that is what analysis is for — so it announces its state
+            // instead. Requiring a comma there would demand Mira invent
+            // attributes it does not know.
+            let isAnalyzing = label.contains("Still being analyzed")
             XCTAssertTrue(
-                label.contains(","),
-                "tile label is not a whole description: \(label)"
+                isAnalyzing || label.contains(","),
+                "tile label is neither a whole description nor a state: \(label)"
             )
         }
     }
@@ -112,35 +117,50 @@ final class AccessibilityTests: MiraUITestCase {
     ///
     /// The tile is deliberately a single accessibility element, so the heart is
     /// not an element of its own — it is reached through the tile's `favorite`
-    /// custom action. XCUITest cannot enumerate custom actions, so what is
-    /// asserted here is the half that IS observable: that favourite state
-    /// reaches the label rather than living only in the heart's fill colour.
+    /// custom action (D-016). XCUITest cannot enumerate custom actions, so what
+    /// is asserted is the half that IS observable: that favourite state reaches
+    /// the label rather than living only in the heart's fill colour (A11Y-4).
     ///
-    /// That the action itself is wired is covered by the unit test on
-    /// `GarmentTile`; the VoiceOver rotor gesture remains a manual check
-    /// (`docs/02-design/accessibility.md` §10).
+    /// The state is created here rather than assumed from the seed. An earlier
+    /// version looked for an already-favourited garment on the first screenful,
+    /// which broke the moment newly captured garments arrived at the top of the
+    /// closet — a test that depended on what the seed happened to put in view.
     func testFavouriteStateIsAudibleOnTiles() throws {
         guard openCloset() else { return }
 
-        // Nothing in the tree should expose a bare, orphaned favourite control:
-        // if one appears on the closet it means the tile stopped being a single
-        // element and shattered into fragments.
-        let strayToggles = app.switches.matching(
-            NSPredicate(format: "label CONTAINS[c] 'favourite'")
-        )
+        // No orphaned toggle on the grid: if one appears, the tile has stopped
+        // being a single element and shattered into fragments.
         XCTAssertEqual(
-            strayToggles.count, 0,
+            app.switches.matching(NSPredicate(format: "label CONTAINS[c] 'favourite'")).count,
+            0,
             "the garment tile should be one element, with favourite as a custom action"
         )
 
-        // The realistic seed contains favourited garments, so at least one tile
-        // on the first screenful announces the state.
-        let favourited = app.buttons.matching(
+        let tile = garmentTiles.firstMatch
+        XCTAssertTrue(tile.waitForExistence(timeout: 15), "no garment tile to favourite")
+        let labelBefore = tile.label
+        tile.tap()
+
+        // Favourite it from detail, where the control is a real toggle.
+        let favourite = app.switches.matching(
+            NSPredicate(format: "label BEGINSWITH[c] 'Favourite'")
+        ).firstMatch
+        XCTAssertTrue(favourite.waitForExistence(timeout: 15), "no favourite toggle on detail")
+        favourite.tap()
+
+        app.buttons["Back"].tap()
+
+        // Back on the grid, the same tile now says so.
+        let favourited = app.buttons.matching(identifier: "garment-tile").matching(
             NSPredicate(format: "label CONTAINS[c] 'Favourited'")
-        )
-        XCTAssertGreaterThan(
-            favourited.count, 0,
-            "no tile announces its favourite state — colour alone cannot carry it (A11Y-4)"
+        ).firstMatch
+
+        XCTAssertTrue(
+            favourited.waitForExistence(timeout: 20),
+            """
+            Favouriting a garment did not change what its tile announces —
+            colour alone cannot carry the state (A11Y-4). Tile was: \(labelBefore)
+            """
         )
     }
 

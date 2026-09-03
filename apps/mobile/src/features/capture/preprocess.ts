@@ -13,7 +13,7 @@
  */
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { Directory, File, Paths } from 'expo-file-system';
-import { CAPTURE_DIR, JPEG_QUALITY, constrain } from './preprocess-core.js';
+import { CAPTURE_DIR, JPEG_QUALITY, constrain } from './preprocess-core';
 
 
 function captureDirectory(): Directory {

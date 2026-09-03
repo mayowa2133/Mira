@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_EDGE, constrain } from './preprocess-core.js';
+import { MAX_EDGE, constrain } from './preprocess-core';
 
 describe('constrain', () => {
   it('pins the long edge of a portrait photo — the common garment case', () => {

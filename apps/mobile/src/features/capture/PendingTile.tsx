@@ -33,6 +33,7 @@ export function PendingTile({ entry, onRetry, onDiscard }: PendingTileProps) {
   return (
     <Pressable
       style={styles.root}
+      testID="pending-capture"
       onPress={failed ? () => onRetry(entry.id) : undefined}
       accessibilityRole={failed ? 'button' : 'image'}
       accessibilityLabel={label}

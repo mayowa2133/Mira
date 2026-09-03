@@ -15,7 +15,7 @@ import {
   remove,
   retry,
   type QueueState,
-} from './queue-core.js';
+} from './queue-core';
 
 const T0 = 1_000_000;
 

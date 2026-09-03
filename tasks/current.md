@@ -45,6 +45,22 @@ which is blocked on B-2.
       human rotor pass in `accessibility.md` §10 still stands as a release
       ritual — an audit cannot hear whether a screen makes sense.
 
+## Phase 2 — verified on device 2026-09-03
+
+Capture works end to end on an iPhone 17 Pro simulator against the real stack.
+Evidence, rather than "it builds":
+
+- `POST /media/upload-url` 200 → `PUT /media/upload/*` 204 → `POST /imports/photo`
+  202 in the API log, and `photo_library` garments in `analyzing` state in the
+  database.
+- The closet shows 228 pieces, up from the 227-garment seed, with the imported
+  photograph rendering from real uploaded imagery.
+- 17 XCUITests pass, including two new capture tests.
+
+**Not covered:** the shutter itself. The simulator has no camera, so
+`takePictureAsync` is unexercised — the capture tests reach the same code path
+through the photo library. Real-device capture remains a manual check.
+
 ## Blocked
 
 ### B-5 — No queue transport between API and worker

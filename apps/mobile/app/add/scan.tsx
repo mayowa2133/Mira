@@ -42,10 +42,18 @@ export default function ScanScreen() {
       enqueueCapture({ id, localUri: prepared.localUri, source });
 
       // §9: "a subtle `Got it.` confirmation before routing to review."
+      //
+      // Review is the AI item screen, which is Phase 3. Until it exists the
+      // right destination is the CLOSET, not `back()` — back returns to the add
+      // menu, which leaves the user staring at a list of options immediately
+      // after photographing something, with no sight of the thing they added.
       setConfirmation('Got it.');
       setTimeout(() => {
         setConfirmation(null);
-        router.back();
+        // Close the camera (and the add menu beneath it), then land where the
+        // capture actually is.
+        router.dismissAll();
+        router.replace('/(tabs)/closet');
       }, 700);
     },
     [router],

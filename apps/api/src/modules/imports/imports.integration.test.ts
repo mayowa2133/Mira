@@ -337,6 +337,58 @@ describe('POST /imports/photo', () => {
   });
 });
 
+describe('PUT /media/upload/* — the actual bytes', () => {
+  /**
+   * This is the step that turns a signed target into a stored photograph, and
+   * it was broken from Phase 1 until Phase 2 without anything noticing.
+   *
+   * Fastify parses JSON and urlencoded and rejects every other content type, so
+   * `image/jpeg` never reached the handler: the `Buffer.isBuffer(request.body)`
+   * check inside it was unreachable code. Nothing caught it because the seed
+   * writes to storage directly and the UI tests never uploaded.
+   */
+  dbIt('accepts image bytes and stores them verbatim', async () => {
+    const userId = await userIdOf(ALICE);
+    const key = buildStorageKey('garments', userId, crypto.randomUUID(), 'photo.jpg');
+
+    const signed = await storage!.signedUploadUrl('garments', userId, 'photo.jpg');
+    const url = new URL(signed.uploadUrl);
+
+    // A JPEG's opening bytes; the point is that it is not JSON.
+    const bytes = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
+
+    const response = await app!.inject({
+      method: 'PUT',
+      url: `${url.pathname}${url.search}`,
+      headers: { 'content-type': 'image/jpeg' },
+      payload: bytes,
+    });
+
+    expect(response.statusCode).toBe(204);
+
+    const stored = await storage!.get(signed.storageKey);
+    expect(stored).not.toBeNull();
+    expect(Buffer.compare(stored as Buffer, bytes)).toBe(0);
+    void key;
+  });
+
+  dbIt('rejects a body it cannot treat as an image', async () => {
+    const userId = await userIdOf(ALICE);
+    const signed = await storage!.signedUploadUrl('garments', userId, 'photo.jpg');
+    const url = new URL(signed.uploadUrl);
+
+    const response = await app!.inject({
+      method: 'PUT',
+      url: `${url.pathname}${url.search}`,
+      headers: { 'content-type': 'text/plain' },
+      payload: 'definitely not a photograph',
+    });
+
+    expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    expect(await storage!.exists(signed.storageKey)).toBe(false);
+  });
+});
+
 describe('GET /imports/:id', () => {
   dbIt("404s on another user's job rather than 403", async () => {
     const key = await uploadedPhoto(ALICE);

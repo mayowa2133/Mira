@@ -29,30 +29,20 @@ class MiraUITestCase: XCTestCase {
 
     // MARK: - Element queries
 
-    /// React Navigation renders tab items as plain buttons labelled
-    /// "<Title>, tab, N of M" — there is no UIKit tab bar to query, and the
-    /// label is not the bare title. Both facts are easy to get wrong, and both
-    /// are why every tile query below has to exclude tabs explicitly.
-    private static let tabLabelSuffix = ", tab,"
-
-    /// A garment tile: a button whose label joins brand, name, colour and size
-    /// into one phrase (`docs/02-design/accessibility.md` §4).
+    /// Garment tiles, by identifier.
     ///
-    /// The comma test alone is not enough: the tab buttons contain commas too,
-    /// so a naive query matches five tabs on every screen and any assertion
-    /// about "tiles" passes without a single garment on screen.
+    /// Emphatically NOT by label. The first version of this suite matched "any
+    /// button whose label contains a comma", which also matched the tab items
+    /// ("Closet, tab, 2 of 5") and the selected category chip ("All, selected").
+    /// Tests then measured chrome instead of content — and passed, which is
+    /// worse than failing.
     var garmentTiles: XCUIElementQuery {
-        app.buttons.matching(
-            NSPredicate(
-                format: """
-                    label CONTAINS[c] ',' \
-                    AND NOT (label CONTAINS[c] %@) \
-                    AND NOT (label CONTAINS[c] 'Add to your closet') \
-                    AND NOT (label CONTAINS[c] 'applied filter')
-                    """,
-                Self.tabLabelSuffix
-            )
-        )
+        app.buttons.matching(identifier: "garment-tile")
+    }
+
+    /// Captures that are on the device but not yet on the server.
+    var pendingCaptures: XCUIElementQuery {
+        app.buttons.matching(identifier: "pending-capture")
     }
 
     /// The closet grid, chosen by height.

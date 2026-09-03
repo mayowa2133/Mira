@@ -28,6 +28,14 @@ import { getPool } from '../db/pool.js';
 import { createLocalStorage, type StorageDriver } from '../lib/storage.js';
 import { resolveStorageRoot } from '../lib/storage-root.js';
 
+/**
+ * The hard cap on an uploaded image (`docs/06-ai/image-processing.md` §8).
+ *
+ * The client downscales to a 2048px longest edge before uploading; this is the
+ * backstop for a client that does not, or is not ours.
+ */
+export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
 export type BuildServerOptions = {
   env: Env;
   verifier: TokenVerifier;
@@ -78,6 +86,26 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
     trustProxy: true,
     bodyLimit: 1_048_576,
   });
+
+  /**
+   * Binary upload bodies.
+   *
+   * Fastify parses JSON and urlencoded and rejects everything else with
+   * "Unsupported Media Type" — so without this, `PUT /media/upload/*` could
+   * never receive a photograph. It checked `Buffer.isBuffer(request.body)`,
+   * which was unreachable: the body never became a Buffer.
+   *
+   * The cap here is the hard limit from `docs/06-ai/image-processing.md` §8
+   * ("server rejects above the hard cap"), not the 1 MB JSON limit — a 2048px
+   * capture is routinely several megabytes.
+   */
+  app.addContentTypeParser(
+    ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'],
+    { parseAs: 'buffer', bodyLimit: MAX_UPLOAD_BYTES },
+    (_request, body, done) => {
+      done(null, body);
+    },
+  );
 
   app.decorateRequest('actor', undefined);
 

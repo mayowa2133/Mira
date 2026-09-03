@@ -80,6 +80,12 @@ function GarmentTileComponent({ garment, onPress, onToggleFavorite }: GarmentTil
     <Pressable
       style={styles.root}
       onPress={handlePress}
+      // A stable identity for UI tests. Identifying a tile by its LABEL was
+      // fragile in exactly the way labels are: tab items ("Closet, tab, 2 of 5")
+      // and the selected category chip ("All, selected") both matched a
+      // comma-based heuristic, so tests silently measured the wrong elements.
+      // `testID` maps to accessibilityIdentifier and is invisible to VoiceOver.
+      testID="garment-tile"
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityActions={[{ name: 'favorite', label: favoriteActionLabel }]}
