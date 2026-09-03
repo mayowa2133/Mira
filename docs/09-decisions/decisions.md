@@ -199,3 +199,36 @@ Format:
   is wired is a unit-test concern, and the rotor gesture itself stays on the
   manual VoiceOver pass (`accessibility.md` §10). Any future in-tile control
   follows this pattern.
+
+## D-017 — `POST /imports/photo` takes an upload key, not multipart bytes
+
+- **Date:** 2026-09-03 · **Status:** Accepted
+- **Decision:** The photo import endpoint accepts `{ upload_key }` referring to
+  an object the client has already PUT to private storage, as
+  `docs/05-api/api-contract.md` specifies. `docs/03-architecture/data-flow.md`
+  §1 sketches it as `multipart`; that sketch is superseded.
+- **Why:** CLAUDE.md names api-contract.md as the authority on endpoint shapes,
+  and the two documents disagree. Beyond precedence, `POST /media/upload-url`
+  and the scoped PUT target exist precisely so image bytes never proxy through
+  the API: multipart would put every photograph through the request path,
+  double the bytes on the wire, and couple upload progress to an API timeout.
+- **Consequences:** the client uploads first and imports second, which is also
+  what makes the offline queue workable — a queued capture holds a storage key,
+  not a megabyte of body. `data-flow.md` §1 should be corrected when that
+  document is next revised.
+
+## D-018 — Deterministic image operations live in `@mira/imaging`
+
+- **Date:** 2026-09-03 · **Status:** Accepted
+- **Decision:** Blurhash, perceptual hashing and the cutout quality gate live in
+  a shared package that works on decoded pixel buffers. Decoding and resizing —
+  the parts that need `sharp` — stay in the worker.
+- **Why:** the seed invents images and the worker processes real ones, and both
+  must produce identical hashes or seeded data behaves differently from captured
+  data in duplicate detection. Keeping the algorithms free of a native decoder
+  also keeps them testable without one.
+- **Consequences:** `garment_images.image_hash` changed meaning. It was a
+  sha256 prefix explicitly marked "standing in for the real one until Phase 2";
+  it is now a 64-bit DCT hash, 16 hex characters. Existing seeded rows carry the
+  old 32-character value and must be reseeded, not migrated — the old value
+  cannot be converted, only recomputed from pixels.

@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@mira/ai": "*",
+    "@mira/imaging": "*",
     "@mira/taxonomy": "*",
     "@mira/types": "*",
     "fastify": "^5.2.0",

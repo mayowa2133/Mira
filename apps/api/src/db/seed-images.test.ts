@@ -1,8 +1,8 @@
+import { encodeBlurhash } from '@mira/imaging';
 import { describe, expect, it } from 'vitest';
 import { inflateSync } from 'node:zlib';
 import { CATEGORIES, COLOR_SWATCHES, type Color } from '@mira/taxonomy';
 import {
-  encodeBlurhash,
   encodePng,
   hexToRgb,
   imageHash,
@@ -120,7 +120,7 @@ describe('garment rendering', () => {
   it('is deterministic, so seeded closets are comparable between runs', () => {
     const a = renderGarmentImage({ category: 'tops', colorHex: '#000000', width: 64, height: 80 });
     const b = renderGarmentImage({ category: 'tops', colorHex: '#000000', width: 64, height: 80 });
-    expect(imageHash(a.png)).toBe(imageHash(b.png));
+    expect(imageHash(a.pixels, a.width, a.height)).toBe(imageHash(b.pixels, b.width, b.height));
   });
 
   it('keeps a near-white garment visible against the ground', () => {
@@ -163,15 +163,15 @@ describe('blurhash', () => {
 
   it('produces the documented length for 4x3 components', () => {
     // 1 (components) + 1 (max AC) + 4 (DC) + 2 per AC component; 4x3 has 11 AC.
-    expect(encodeBlurhash(pixels, width, height)).toHaveLength(1 + 1 + 4 + 11 * 2);
+    expect(encodeBlurhash({ data: pixels, width, height, channels: 3 })).toHaveLength(1 + 1 + 4 + 11 * 2);
   });
 
   it('uses only base83 characters', () => {
-    expect(encodeBlurhash(pixels, width, height)).toMatch(/^[0-9A-Za-z#$%*+,\-.:;=?@[\]^_{|}~]+$/);
+    expect(encodeBlurhash({ data: pixels, width, height, channels: 3 })).toMatch(/^[0-9A-Za-z#$%*+,\-.:;=?@[\]^_{|}~]+$/);
   });
 
   it('encodes the component count in its first character', () => {
-    const hash = encodeBlurhash(pixels, width, height, 4, 3);
+    const hash = encodeBlurhash({ data: pixels, width, height, channels: 3 }, 4, 3);
     const BASE83 =
       '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~';
     const sizeFlag = BASE83.indexOf(hash[0] as string);
@@ -186,13 +186,14 @@ describe('blurhash', () => {
       width: 160,
       height: 200,
     });
-    expect(encodeBlurhash(pixels, width, height)).not.toBe(
-      encodeBlurhash(other.pixels, other.width, other.height),
+    expect(encodeBlurhash({ data: pixels, width, height, channels: 3 })).not.toBe(
+      encodeBlurhash({ data: other.pixels, width: other.width, height: other.height, channels: 3 }),
     );
   });
 
   it('is deterministic', () => {
-    expect(encodeBlurhash(pixels, width, height)).toBe(encodeBlurhash(pixels, width, height));
+    const image = { data: pixels, width, height, channels: 3 } as const;
+    expect(encodeBlurhash(image)).toBe(encodeBlurhash(image));
   });
 
   // Blurhash describes a blur, so downsampling first must not change what it
@@ -200,7 +201,7 @@ describe('blurhash', () => {
   it('stays fast on a full-size image', () => {
     const big = renderGarmentImage({ category: 'tops', colorHex: '#000000' });
     const started = Date.now();
-    encodeBlurhash(big.pixels, big.width, big.height);
+    encodeBlurhash({ data: big.pixels, width: big.width, height: big.height, channels: 3 });
     expect(Date.now() - started).toBeLessThan(200);
   });
 });
@@ -209,7 +210,10 @@ describe('image hash', () => {
   it('is stable and differs between images', () => {
     const a = renderGarmentImage({ category: 'tops', colorHex: '#000000', width: 32, height: 40 });
     const b = renderGarmentImage({ category: 'shoes', colorHex: '#000000', width: 32, height: 40 });
-    expect(imageHash(a.png)).toHaveLength(32);
-    expect(imageHash(a.png)).not.toBe(imageHash(b.png));
+    // 64 bits of hex, and two different garments do not collide.
+    expect(imageHash(a.pixels, a.width, a.height)).toHaveLength(16);
+    expect(imageHash(a.pixels, a.width, a.height)).not.toBe(
+      imageHash(b.pixels, b.width, b.height),
+    );
   });
 });

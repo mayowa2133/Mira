@@ -4,6 +4,7 @@
     { "path": "./packages/taxonomy" },
     { "path": "./packages/types" },
     { "path": "./packages/ai" },
+    { "path": "./packages/imaging" },
     { "path": "./packages/ui" },
     { "path": "./apps/api" },
     { "path": "./apps/worker" }

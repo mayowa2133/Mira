@@ -18,7 +18,7 @@
  * rectangles would be a poor trade.
  */
 import { deflateSync } from 'node:zlib';
-import { createHash } from 'node:crypto';
+import { perceptualHash } from '@mira/imaging';
 
 // ---------------------------------------------------------------------------
 // PNG encoding
@@ -282,134 +282,13 @@ export function renderGarmentImage(options: {
 // Blurhash
 // ---------------------------------------------------------------------------
 
-const BASE83 =
-  '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~';
-
-function encodeBase83(value: number, length: number): string {
-  let out = '';
-  for (let i = 1; i <= length; i += 1) {
-    const digit = Math.floor(value / 83 ** (length - i)) % 83;
-    out += BASE83[digit];
-  }
-  return out;
-}
-
-const sRgbToLinear = (value: number): number => {
-  const v = value / 255;
-  return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-};
-
-const linearToSRgb = (value: number): number => {
-  const v = Math.max(0, Math.min(1, value));
-  return Math.round((v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055) * 255 + 0.5);
-};
-
-const signPow = (value: number, exp: number) => Math.sign(value) * Math.abs(value) ** exp;
-
 /**
- * Downsample an RGB buffer with nearest-neighbour sampling.
+ * Perceptual hash of a seeded image.
  *
- * Blurhash is O(width x height x components). At full size that is ~6M
- * iterations per image, which across a 227-garment seed is minutes of pure
- * arithmetic for a hash that only ever describes a blur. A small thumbnail
- * gives a visually identical result for a fraction of the work.
+ * Phase 2 replaced the sha256 placeholder that stood here with the real DCT
+ * hash, so seeded imagery now participates in duplicate detection exactly as
+ * uploaded photographs do — which is the only way the seed can exercise it.
  */
-function downsample(
-  pixels: Buffer,
-  width: number,
-  height: number,
-  targetWidth: number,
-): { pixels: Buffer; width: number; height: number } {
-  if (width <= targetWidth) return { pixels, width, height };
-
-  const scale = targetWidth / width;
-  const outWidth = targetWidth;
-  const outHeight = Math.max(1, Math.round(height * scale));
-  const out = Buffer.alloc(outWidth * outHeight * 3);
-
-  for (let y = 0; y < outHeight; y += 1) {
-    const sy = Math.min(height - 1, Math.floor((y / outHeight) * height));
-    for (let x = 0; x < outWidth; x += 1) {
-      const sx = Math.min(width - 1, Math.floor((x / outWidth) * width));
-      const si = (sy * width + sx) * 3;
-      const di = (y * outWidth + x) * 3;
-      out[di] = pixels[si] as number;
-      out[di + 1] = pixels[si + 1] as number;
-      out[di + 2] = pixels[si + 2] as number;
-    }
-  }
-  return { pixels: out, width: outWidth, height: outHeight };
-}
-
-/**
- * Encode a blurhash.
- *
- * The grid shows this while the real image loads, so a seeded garment exercises
- * the same progressive-load path a captured one will
- * (`docs/03-architecture/frontend-architecture.md` §5).
- *
- * Computed on a downsampled copy: blurhash describes a blur, so the extra
- * resolution changes nothing except the running time.
- */
-export function encodeBlurhash(
-  fullPixels: Buffer,
-  fullWidth: number,
-  fullHeight: number,
-  componentX = 4,
-  componentY = 3,
-): string {
-  const { pixels, width, height } = downsample(fullPixels, fullWidth, fullHeight, 32);
-  const factors: [number, number, number][] = [];
-
-  for (let j = 0; j < componentY; j += 1) {
-    for (let i = 0; i < componentX; i += 1) {
-      const normalisation = i === 0 && j === 0 ? 1 : 2;
-      let r = 0;
-      let g = 0;
-      let b = 0;
-      for (let y = 0; y < height; y += 1) {
-        for (let x = 0; x < width; x += 1) {
-          const basis =
-            normalisation *
-            Math.cos((Math.PI * i * x) / width) *
-            Math.cos((Math.PI * j * y) / height);
-          const k = (y * width + x) * 3;
-          r += basis * sRgbToLinear(pixels[k] as number);
-          g += basis * sRgbToLinear(pixels[k + 1] as number);
-          b += basis * sRgbToLinear(pixels[k + 2] as number);
-        }
-      }
-      const scale = 1 / (width * height);
-      factors.push([r * scale, g * scale, b * scale]);
-    }
-  }
-
-  const dc = factors[0];
-  if (!dc) throw new Error('blurhash: no DC component');
-  const ac = factors.slice(1);
-
-  let hash = encodeBase83(componentX - 1 + (componentY - 1) * 9, 1);
-
-  const actualMax = ac.length
-    ? Math.max(...ac.flatMap(([r, g, b]) => [Math.abs(r), Math.abs(g), Math.abs(b)]))
-    : 0;
-  const quantisedMax = ac.length ? Math.max(0, Math.min(82, Math.floor(actualMax * 166 - 0.5))) : 0;
-  const maximum = ac.length ? (quantisedMax + 1) / 166 : 1;
-  hash += encodeBase83(quantisedMax, 1);
-
-  const dcValue = (linearToSRgb(dc[0]) << 16) + (linearToSRgb(dc[1]) << 8) + linearToSRgb(dc[2]);
-  hash += encodeBase83(dcValue, 4);
-
-  for (const [r, g, b] of ac) {
-    const quant = (v: number) =>
-      Math.max(0, Math.min(18, Math.floor(signPow(v / maximum, 0.5) * 9 + 9.5)));
-    hash += encodeBase83(quant(r) * 19 * 19 + quant(g) * 19 + quant(b), 2);
-  }
-
-  return hash;
-}
-
-/** Perceptual-ish hash, standing in for the real one until Phase 2. */
-export function imageHash(png: Buffer): string {
-  return createHash('sha256').update(png).digest('hex').slice(0, 32);
+export function imageHash(rgb: Buffer, width: number, height: number): string {
+  return perceptualHash({ data: rgb, width, height, channels: 3 });
 }

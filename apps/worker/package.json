@@ -13,7 +13,9 @@
   },
   "dependencies": {
     "@mira/ai": "*",
+    "@mira/imaging": "*",
     "@mira/taxonomy": "*",
-    "@mira/types": "*"
+    "@mira/types": "*",
+    "sharp": "^0.35.4"
   }
 }

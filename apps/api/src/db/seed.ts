@@ -21,7 +21,8 @@ import {
   type SeedGarment,
 } from './seed-garments.js';
 import { categoryRowId } from './sync-taxonomy.js';
-import { encodeBlurhash, imageHash, renderGarmentImage } from './seed-images.js';
+import { encodeBlurhash } from '@mira/imaging';
+import { imageHash, renderGarmentImage } from './seed-images.js';
 import { buildStorageKey, createLocalStorage } from '../lib/storage.js';
 import { resolveStorageRoot } from '../lib/storage-root.js';
 import { COLOR_SWATCHES, type Color } from '@mira/taxonomy';
@@ -287,8 +288,8 @@ async function attachSeedImage(
       storageKey,
       width,
       height,
-      encodeBlurhash(pixels, width, height),
-      imageHash(png),
+      encodeBlurhash({ data: pixels, width, height, channels: 3 }),
+      imageHash(pixels, width, height),
     ],
   );
 }

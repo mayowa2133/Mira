@@ -10,6 +10,7 @@
   "references": [
     { "path": "../../packages/taxonomy" },
     { "path": "../../packages/types" },
-    { "path": "../../packages/ai" }
+    { "path": "../../packages/ai" },
+    { "path": "../../packages/imaging" }
   ]
 }
