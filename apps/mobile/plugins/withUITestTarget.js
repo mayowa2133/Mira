@@ -19,7 +19,18 @@ const UI_TESTING_PRODUCT_TYPE = 'com.apple.product-type.bundle.ui-testing';
 
 const swiftFilesIn = (dir) => fs.readdirSync(dir).filter((f) => f.endsWith('.swift')).sort();
 
-/** Copy the tracked Swift sources into the generated project. */
+/**
+ * Link the tracked Swift sources into the generated project.
+ *
+ * SYMLINKS, not copies. Copies meant that editing a test in `e2e/` and running
+ * `xcodebuild` compiled the previous version — the suite passed, or failed for
+ * a reason that had been fixed, and nothing said the source on disk was not the
+ * source under test. That is the same shape as B-3, where a verification
+ * harness failed quietly and was mistaken for the thing it was verifying.
+ *
+ * `ios/` is generated and gitignored, so nothing outside this directory has to
+ * care that these are links.
+ */
 const withUITestSources = (config) =>
   withDangerousMod(config, [
     'ios',
@@ -34,7 +45,8 @@ const withUITestSources = (config) =>
       fs.rmSync(to, { recursive: true, force: true });
       fs.mkdirSync(to, { recursive: true });
       for (const file of swiftFilesIn(from)) {
-        fs.copyFileSync(path.join(from, file), path.join(to, file));
+        const link = path.join(to, file);
+        fs.symlinkSync(path.relative(path.dirname(link), path.join(from, file)), link);
       }
 
       fs.writeFileSync(

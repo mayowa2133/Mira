@@ -184,6 +184,54 @@ weak evidence.
       settle. What is held structurally: the numbers are collapsed until asked
       for, rails lead with a sentence, and Home has no counts-first block.
 
+## Phase 4 status (partial — duplicate detection only)
+
+| # | Task | Status |
+| - | ---- | ------ |
+| 4.1 | Tag camera + barcode detection | **Not started** |
+| 4.2 | OCR + tag reading | **Not started** — needs a vision provider |
+| 4.3 | Receipt capture | **Not started** |
+| 4.4 | receipt.parse worker | **Not started** — needs a vision provider |
+| 4.5 | Multi-item confirmation list | **Not started** |
+| 4.6 | Duplicate detection: signals, scoring, thresholds | **Done** — eight of nine signals; the ninth needs Phase 5 embeddings |
+| 4.7 | Duplicate resolution sheet + merge + garment_duplicates | **Done** — API and sheet |
+| 4.8 | Evaluation: tags, receipts, duplicate pairs | **Not started** — needs the 50+50 pair dataset |
+
+### What duplicate detection does NOT yet cover
+
+**The photo path.** `POST /imports/photo` keeps its exact-hash guard and nothing
+more, because at capture a photo import has category `other`, no brand, no name
+and no hash — the hash is computed by the worker. The weighted check happens
+later and surfaces as "You might already own this" (D-026). Read that as a
+documented difference from the manual path, not as coverage.
+
+**Visual embedding similarity**, which is the one signal in §2 that needs a
+model. The combination is additive, so it drops in when Phase 5 produces
+embeddings without moving a threshold.
+
+**Precision and recall are unmeasured.** §7 wants 50 duplicate pairs and 50
+similar-but-different pairs; neither exists. The scoring is unit-tested against
+the spec's own worked examples, which is not the same claim.
+
+## Phase 9.2 — done
+
+`GET /wardrobe/similar-owned` and a section on the insights screen. No
+closet-size gate, unlike the other insights: those are statistical claims about
+a wardrobe, this is a fact about two specific garments.
+
+## Gotchas worth keeping
+
+**Editing an XCUITest used to test the previous version.** `e2e/MiraUITests/`
+was COPIED into the generated `ios/` at prebuild time, so a test edited and run
+without re-running prebuild compiled the old file — passing, or failing for a
+reason already fixed, with nothing saying the source under test was not the
+source on disk. They are symlinks now (`plugins/withUITestTarget.js`).
+
+**A running API can be several commits behind.** `npm run api` serves `dist/`;
+without a rebuild and restart, an endpoint added minutes ago returns 404 and
+the obvious conclusion is that the routing is wrong. This has now cost time
+twice.
+
 ## Known flakes
 
 ### ~~Worker suite — one unexplained failure in ~10 runs~~ — EXPLAINED 2026-09-04
