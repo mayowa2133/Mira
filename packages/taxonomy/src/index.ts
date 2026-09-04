@@ -11,3 +11,4 @@
  */
 export * from './generated.js';
 export * from './clamp.js';
+export * from './slots.js';

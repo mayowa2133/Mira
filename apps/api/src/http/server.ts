@@ -21,6 +21,9 @@ import { registerMediaRoutes } from '../modules/media/routes.js';
 import { registerImportRoutes } from '../modules/imports/routes.js';
 import { ImportsRepository } from '../modules/imports/repository.js';
 import { ImportsService, type JobEnqueuer } from '../modules/imports/service.js';
+import { registerOutfitRoutes } from '../modules/outfits/routes.js';
+import { OutfitRepository } from '../modules/outfits/repository.js';
+import { OutfitService } from '../modules/outfits/service.js';
 import { ClosetService } from '../modules/closet/service.js';
 import { GarmentRepository } from '../modules/closet/repository.js';
 import { IdentityRepository } from '../modules/identity/repository.js';
@@ -208,6 +211,10 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
         identity,
       });
       await registerMediaRoutes(instance, { storage });
+
+      await registerOutfitRoutes(instance, {
+        service: new OutfitService(new OutfitRepository(pool), garments, storage),
+      });
 
       const importsRepository = new ImportsRepository(pool);
       await registerImportRoutes(instance, {

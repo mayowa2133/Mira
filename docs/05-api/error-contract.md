@@ -58,7 +58,8 @@ provider_rejected
 ### Resources
 ```text
 garment_not_found · outfit_not_found · candidate_not_found ·
-try_on_not_found · body_profile_not_found · import_not_found · job_not_found
+try_on_not_found · body_profile_not_found · import_not_found · job_not_found ·
+wear_event_not_found
 ```
 
 ### Validation
@@ -120,6 +121,7 @@ Message copy is part of the product, not an afterthought.
 | Code | Message |
 | ---- | ------- |
 | `garment_not_found` | "This piece isn't in your closet any more." |
+| `wear_event_not_found` | "We couldn't find that wear." |
 | `no_garment_detected` | "We couldn't find a garment in that photo. Try one item at a time?" |
 | `tag_unreadable` | "That tag was hard to read — try again with it flat and well lit?" |
 | `receipt_unreadable` | "We couldn't read that receipt. A flatter photo usually helps." |

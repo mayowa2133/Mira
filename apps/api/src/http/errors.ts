@@ -23,6 +23,7 @@ export const ErrorCode = {
   bodyProfileNotFound: 'body_profile_not_found',
   importNotFound: 'import_not_found',
   jobNotFound: 'job_not_found',
+  wearEventNotFound: 'wear_event_not_found',
 
   // Validation
   validationFailed: 'validation_failed',
@@ -75,6 +76,7 @@ const MESSAGES: Partial<Record<ErrorCodeValue, string>> = {
   [ErrorCode.tokenInvalid]: 'Please sign in again.',
   [ErrorCode.garmentNotFound]: "This piece isn't in your closet any more.",
   [ErrorCode.outfitNotFound]: "This look isn't saved any more.",
+  [ErrorCode.wearEventNotFound]: "We couldn't find that wear.",
   [ErrorCode.candidateNotFound]: "We can't find that purchase any more.",
   [ErrorCode.tryOnNotFound]: "That try-on isn't available any more.",
   [ErrorCode.bodyProfileNotFound]: 'Add a few photos so Mira can show your wardrobe on you.',

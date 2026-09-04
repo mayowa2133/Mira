@@ -1,0 +1,437 @@
+/**
+ * Outfits and wear tracking against a REAL Postgres.
+ *
+ * The two behaviours worth this much setup are the ones that cannot be checked
+ * without the database: that wearing a look wears every garment in it, and that
+ * `worn_count` is derived by a trigger rather than written by anyone.
+ *
+ *   npm run db:up && npm run db:migrate && npm test
+ */
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { SignJWT } from 'jose';
+import pg from 'pg';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { FastifyInstance } from 'fastify';
+import { buildServer } from '../../http/server.js';
+import { loadEnv } from '../../config/env.js';
+import { createDevVerifier } from '../identity/verify.js';
+import { createLogger } from '../../lib/logger.js';
+import { createLocalStorage } from '@mira/storage';
+
+const SECRET = 'outfits-integration-secret';
+const DATABASE_URL = process.env['DATABASE_URL'] ?? 'postgresql://mira:mira@localhost:5433/mira';
+
+const testEnv = loadEnv({
+  NODE_ENV: 'test',
+  MIRA_ENV: 'local',
+  LOG_LEVEL: 'fatal',
+  DEV_AUTH_SECRET: SECRET,
+  JWT_AUDIENCE: 'mira',
+  DATABASE_URL,
+} as NodeJS.ProcessEnv);
+
+const storageRoot = mkdtempSync(join(tmpdir(), 'mira-outfits-it-'));
+
+let app: FastifyInstance | null = null;
+let pool: pg.Pool | null = null;
+let available = false;
+
+const ALICE = 'outfits-it-alice';
+const MALLORY = 'outfits-it-mallory';
+
+async function token(subject: string): Promise<string> {
+  return new SignJWT({ email: `${subject}@mira.local` })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(subject)
+    .setAudience('mira')
+    .setIssuedAt()
+    .setExpirationTime('1h')
+    .sign(new TextEncoder().encode(SECRET));
+}
+
+async function auth(subject: string) {
+  return {
+    authorization: `Bearer ${await token(subject)}`,
+    'idempotency-key': crypto.randomUUID(),
+  };
+}
+
+async function userIdOf(subject: string): Promise<string> {
+  const { rows } = await pool!.query<{ id: string }>(
+    'select id from users where auth_provider_id = $1',
+    [subject],
+  );
+  return rows[0]!.id;
+}
+
+/** A garment in Alice's closet, of a given category. */
+async function garment(category = 'tops'): Promise<string> {
+  const userId = await userIdOf(ALICE);
+  const { rows } = await pool!.query<{ id: string }>(
+    `insert into garments (user_id, closet_id, category, source_type, analysis_state)
+     values ($1, (select id from closets where user_id = $1 limit 1), $2, 'manual', 'skipped')
+     returning id`,
+    [userId, category],
+  );
+  return rows[0]!.id;
+}
+
+async function createLook(items: { garment_id: string; slot: string }[]) {
+  const response = await app!.inject({
+    method: 'POST',
+    url: '/v1/outfits',
+    headers: await auth(ALICE),
+    payload: { name: 'Dinner', occasion: 'dinner', items },
+  });
+  return response;
+}
+
+beforeAll(async () => {
+  process.env['DATABASE_URL'] = DATABASE_URL;
+  const candidate = new pg.Pool({ connectionString: DATABASE_URL, max: 4 });
+  try {
+    const { rows } = await candidate.query<{ count: string }>(
+      "select count(*) as count from information_schema.tables where table_name = 'outfits'",
+    );
+    if (rows[0]?.count === '0') throw new Error('run `npm run db:migrate`');
+    pool = candidate;
+    available = true;
+  } catch {
+    await candidate.end().catch(() => undefined);
+    available = false;
+    return;
+  }
+
+  await pool.query('delete from users where auth_provider_id = any($1::text[])', [
+    [ALICE, MALLORY],
+  ]);
+
+  app = await buildServer({
+    env: testEnv,
+    verifier: createDevVerifier(testEnv),
+    logger: createLogger({ level: 'fatal', sink: () => undefined }),
+    checkDependencies: async () => ({ database: true, queue: true, storage: true }),
+    storage: createLocalStorage({
+      root: storageRoot,
+      secret: 'test',
+      publicBaseUrl: 'http://localhost:4000/v1',
+    }),
+  });
+
+  for (const subject of [ALICE, MALLORY]) {
+    await app.inject({
+      method: 'GET',
+      url: '/v1/auth/me',
+      headers: { authorization: `Bearer ${await token(subject)}` },
+    });
+  }
+});
+
+afterAll(async () => {
+  await app?.close();
+  await pool
+    ?.query('delete from users where auth_provider_id = any($1::text[])', [[ALICE, MALLORY]])
+    .catch(() => undefined);
+  await pool?.end();
+  rmSync(storageRoot, { recursive: true, force: true });
+});
+
+beforeEach(async () => {
+  if (!available || !pool) return;
+  const userId = await userIdOf(ALICE);
+  await pool.query('delete from wear_events where user_id = $1', [userId]);
+  await pool.query('delete from outfits where user_id = $1', [userId]);
+  await pool.query('delete from garments where user_id = $1', [userId]);
+});
+
+const dbIt = (name: string, fn: () => Promise<void>) =>
+  it(name, async () => {
+    if (!available || !app) {
+      console.warn(`skipping "${name}": no migrated database at ${DATABASE_URL}`);
+      return;
+    }
+    await fn();
+  });
+
+describe('POST /outfits', () => {
+  dbIt('creates a look from owned garments', async () => {
+    const top = await garment('tops');
+    const bottom = await garment('bottoms');
+
+    const response = await createLook([
+      { garment_id: top, slot: 'top' },
+      { garment_id: bottom, slot: 'bottom' },
+    ]);
+
+    expect(response.statusCode).toBe(201);
+    const body = response.json();
+    expect(body.items).toHaveLength(2);
+    expect(body.wear).toMatchObject({ count: 0, last_worn_at: null });
+  });
+
+  dbIt('saves a dress worn over a top, because that is a real outfit', async () => {
+    // taxonomy §14: the user may override the exclusivity rule. A product that
+    // refuses to save this is wrong about clothes.
+    const dress = await garment('dresses');
+    const top = await garment('tops');
+
+    const response = await createLook([
+      { garment_id: dress, slot: 'dress' },
+      { garment_id: top, slot: 'top' },
+    ]);
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json().items).toHaveLength(2);
+  });
+
+  dbIt("refuses another user's garment", async () => {
+    const mallorysUserId = await userIdOf(MALLORY);
+    const { rows } = await pool!.query<{ id: string }>(
+      `insert into garments (user_id, closet_id, category, source_type, analysis_state)
+       values ($1, (select id from closets where user_id = $1 limit 1), 'tops', 'manual', 'skipped')
+       returning id`,
+      [mallorysUserId],
+    );
+
+    const response = await createLook([{ garment_id: rows[0]!.id, slot: 'top' }]);
+    expect(response.statusCode).toBe(404);
+  });
+
+  dbIt('rejects an unknown slot rather than storing it', async () => {
+    const top = await garment('tops');
+    const response = await createLook([{ garment_id: top, slot: 'hat' }]);
+
+    // 422, per the error contract: failed validation, shown inline.
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.code).toBe('validation_failed');
+  });
+
+  dbIt('refuses a look with no pieces', async () => {
+    const response = await app!.inject({
+      method: 'POST',
+      url: '/v1/outfits',
+      headers: await auth(ALICE),
+      payload: { name: 'Empty', items: [] },
+    });
+    expect(response.statusCode).toBe(422);
+  });
+
+  dbIt('requires an Idempotency-Key', async () => {
+    const top = await garment('tops');
+    const response = await app!.inject({
+      method: 'POST',
+      url: '/v1/outfits',
+      headers: { authorization: `Bearer ${await token(ALICE)}` },
+      payload: { items: [{ garment_id: top, slot: 'top' }] },
+    });
+    expect(response.statusCode).toBe(400);
+  });
+});
+
+describe('POST /wear-events', () => {
+  dbIt('wearing a look wears every garment in it', async () => {
+    const top = await garment('tops');
+    const bottom = await garment('bottoms');
+    const look = (
+      await createLook([
+        { garment_id: top, slot: 'top' },
+        { garment_id: bottom, slot: 'bottom' },
+      ])
+    ).json();
+
+    const response = await app!.inject({
+      method: 'POST',
+      url: '/v1/wear-events',
+      headers: await auth(ALICE),
+      payload: { outfit_id: look.id },
+    });
+
+    expect(response.statusCode).toBe(201);
+    // One for the look, one for each garment.
+    expect(response.json().created).toBe(3);
+
+    const { rows } = await pool!.query<{ worn_count: number }>(
+      'select worn_count from garments where id = any($1::uuid[])',
+      [[top, bottom]],
+    );
+    // Without this, "I wore this look" would leave every garment in it still
+    // reading as never worn.
+    expect(rows.map((r) => r.worn_count)).toEqual([1, 1]);
+  });
+
+  dbIt('derives the counters rather than trusting anyone to set them', async () => {
+    const top = await garment('tops');
+
+    for (const day of ['2026-09-01', '2026-09-02', '2026-09-03']) {
+      await app!.inject({
+        method: 'POST',
+        url: '/v1/wear-events',
+        headers: await auth(ALICE),
+        payload: { garment_id: top, worn_on: day },
+      });
+    }
+
+    const { rows } = await pool!.query<{ worn_count: number; last_worn_at: Date }>(
+      'select worn_count, last_worn_at from garments where id = $1',
+      [top],
+    );
+    expect(rows[0]!.worn_count).toBe(3);
+    expect(rows[0]!.last_worn_at?.toISOString().slice(0, 10)).toBe('2026-09-03');
+  });
+
+  dbIt('a deleted wear takes the count back down', async () => {
+    const top = await garment('tops');
+    const created = await app!.inject({
+      method: 'POST',
+      url: '/v1/wear-events',
+      headers: await auth(ALICE),
+      payload: { garment_id: top },
+    });
+
+    await app!.inject({
+      method: 'DELETE',
+      url: `/v1/wear-events/${created.json().ids[0]}`,
+      headers: await auth(ALICE),
+    });
+
+    const { rows } = await pool!.query<{ worn_count: number; last_worn_at: Date | null }>(
+      'select worn_count, last_worn_at from garments where id = $1',
+      [top],
+    );
+    // Recomputed, not decremented: a double-fire cannot drift the number.
+    expect(rows[0]!.worn_count).toBe(0);
+    expect(rows[0]!.last_worn_at).toBeNull();
+  });
+
+  dbIt('defaults to today', async () => {
+    const top = await garment('tops');
+    await app!.inject({
+      method: 'POST',
+      url: '/v1/wear-events',
+      headers: await auth(ALICE),
+      payload: { garment_id: top },
+    });
+
+    const { rows } = await pool!.query<{ worn_on: string }>(
+      'select worn_on::text as worn_on from wear_events where garment_id = $1',
+      [top],
+    );
+    expect(rows[0]!.worn_on).toBe(new Date().toISOString().slice(0, 10));
+  });
+
+  dbIt('refuses an event about nothing', async () => {
+    const response = await app!.inject({
+      method: 'POST',
+      url: '/v1/wear-events',
+      headers: await auth(ALICE),
+      payload: { note: 'lovely day' },
+    });
+    expect(response.statusCode).toBe(422);
+  });
+
+  dbIt("refuses another user's garment", async () => {
+    const mallorysUserId = await userIdOf(MALLORY);
+    const { rows } = await pool!.query<{ id: string }>(
+      `insert into garments (user_id, closet_id, category, source_type, analysis_state)
+       values ($1, (select id from closets where user_id = $1 limit 1), 'tops', 'manual', 'skipped')
+       returning id`,
+      [mallorysUserId],
+    );
+
+    const response = await app!.inject({
+      method: 'POST',
+      url: '/v1/wear-events',
+      headers: await auth(ALICE),
+      payload: { garment_id: rows[0]!.id },
+    });
+    expect(response.statusCode).toBe(404);
+  });
+});
+
+describe('GET /outfits', () => {
+  dbIt('separates the tabs by what they actually ask', async () => {
+    const top = await garment('tops');
+    const look = (await createLook([{ garment_id: top, slot: 'top' }])).json();
+
+    const mine = await app!.inject({
+      method: 'GET',
+      url: '/v1/outfits?tab=mine',
+      headers: { authorization: `Bearer ${await token(ALICE)}` },
+    });
+    expect(mine.json().data).toHaveLength(1);
+
+    // Not worn and not saved yet.
+    for (const tab of ['worn', 'saved']) {
+      const response = await app!.inject({
+        method: 'GET',
+        url: `/v1/outfits?tab=${tab}`,
+        headers: { authorization: `Bearer ${await token(ALICE)}` },
+      });
+      expect(response.json().data).toHaveLength(0);
+    }
+
+    await app!.inject({
+      method: 'POST',
+      url: `/v1/outfits/${look.id}/favorite`,
+      headers: await auth(ALICE),
+      payload: { favorite: true },
+    });
+    await app!.inject({
+      method: 'POST',
+      url: '/v1/wear-events',
+      headers: await auth(ALICE),
+      payload: { outfit_id: look.id },
+    });
+
+    for (const tab of ['worn', 'saved']) {
+      const response = await app!.inject({
+        method: 'GET',
+        url: `/v1/outfits?tab=${tab}`,
+        headers: { authorization: `Bearer ${await token(ALICE)}` },
+      });
+      expect(response.json().data, tab).toHaveLength(1);
+    }
+  });
+
+  dbIt("never shows another user's looks", async () => {
+    const top = await garment('tops');
+    await createLook([{ garment_id: top, slot: 'top' }]);
+
+    const response = await app!.inject({
+      method: 'GET',
+      url: '/v1/outfits?tab=mine',
+      headers: { authorization: `Bearer ${await token(MALLORY)}` },
+    });
+    expect(response.json().data).toHaveLength(0);
+  });
+});
+
+describe('GET /outfits/:id', () => {
+  dbIt('hydrates each garment so look detail needs one request', async () => {
+    const top = await garment('tops');
+    const look = (await createLook([{ garment_id: top, slot: 'top' }])).json();
+
+    const response = await app!.inject({
+      method: 'GET',
+      url: `/v1/outfits/${look.id}`,
+      headers: { authorization: `Bearer ${await token(ALICE)}` },
+    });
+
+    const item = response.json().items[0];
+    expect(item).toMatchObject({ garment_id: top, slot: 'top', category: 'tops' });
+  });
+
+  dbIt("404s on another user's look", async () => {
+    const top = await garment('tops');
+    const look = (await createLook([{ garment_id: top, slot: 'top' }])).json();
+
+    const response = await app!.inject({
+      method: 'GET',
+      url: `/v1/outfits/${look.id}`,
+      headers: { authorization: `Bearer ${await token(MALLORY)}` },
+    });
+    expect(response.statusCode).toBe(404);
+  });
+});

@@ -190,7 +190,7 @@ Responses always include `interpretation` — the filters and terms Mira underst
 ## Outfits
 
 ```text
-GET    /outfits                       ?tab=saved|worn|mira|mine
+GET    /outfits                       ?tab=saved|worn|mira|mine&limit=
 POST   /outfits                       create from selected garments
 GET    /outfits/:id
 PATCH  /outfits/:id

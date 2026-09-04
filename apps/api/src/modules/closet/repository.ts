@@ -263,6 +263,21 @@ export class GarmentRepository {
     return rows.map((r) => ({ category: r.category, count: Number(r.count) }));
   }
 
+  /** Several garments by id, for hydrating a look's constituent pieces. */
+  async findByIds(scope: UserScope, ids: string[]): Promise<GarmentRow[]> {
+    if (ids.length === 0) return [];
+    const { rows } = await scopedQuery<GarmentRow>(
+      this.db,
+      scope,
+      `select ${GARMENT_COLUMNS}
+         from garments g
+         left join brands b on b.id = g.brand_id
+        where g.user_id = $1 and g.id = any($2::uuid[]) and g.deleted_at is null`,
+      [scope.userId, ids],
+    );
+    return rows;
+  }
+
   async findById(scope: UserScope, id: string): Promise<GarmentRow | null> {
     const { rows } = await scopedQuery<GarmentRow>(
       this.db,
