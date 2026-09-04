@@ -1,0 +1,314 @@
+import { describe, expect, it } from 'vitest';
+import {
+  ASK_SOFTLY_THRESHOLD,
+  ASK_THRESHOLD,
+  NOTE_THRESHOLD,
+  bandFor,
+  combine,
+  compare,
+  diceSimilarity,
+  nameTokens,
+  normalizeProductUrl,
+  sameBrand,
+  scoreAgainst,
+  signalsBetween,
+  summarize,
+  tokenize,
+  type DuplicateSubject,
+} from './index.js';
+
+function garment(overrides: Partial<DuplicateSubject> = {}): DuplicateSubject {
+  return {
+    name: null,
+    brandId: null,
+    brandRaw: null,
+    category: 'tops',
+    primaryColor: null,
+    sizeNormalized: null,
+    sizeRaw: null,
+    barcode: null,
+    sku: null,
+    retailer: null,
+    productUrl: null,
+    purchaseDate: null,
+    sourceType: 'manual',
+    sourceReference: null,
+    imageHashes: [],
+    ...overrides,
+  };
+}
+
+describe('name comparison', () => {
+  it('treats the spec’s own example as the same name', () => {
+    // duplicate-detection.md §2: "Contour Bodysuit" vs "Contour Crew Bodysuit".
+    const similarity = diceSimilarity(
+      tokenize('Contour Bodysuit'),
+      tokenize('Contour Crew Bodysuit'),
+    );
+    expect(similarity).toBeCloseTo(0.8, 5);
+  });
+
+  it('keeps one different word apart', () => {
+    // One character apart, a genuinely different garment.
+    expect(diceSimilarity(tokenize('black midi dress'), tokenize('black mini dress'))).toBeCloseTo(
+      2 / 3,
+      5,
+    );
+  });
+
+  it('does not let a short name be swallowed by a longer one', () => {
+    expect(diceSimilarity(tokenize('dress'), tokenize('black dress'))).toBeCloseTo(2 / 3, 5);
+  });
+
+  it('strips the brand out of a name that repeats it', () => {
+    expect(nameTokens('Aritzia Contour Bodysuit', 'Aritzia')).toEqual(['contour', 'bodysuit']);
+  });
+
+  it('keeps the name when it is only the brand', () => {
+    // Stripping would leave nothing, and an empty set scores 0 — which reads as
+    // "different" rather than "unknown".
+    expect(nameTokens('Aritzia', 'Aritzia')).toEqual(['aritzia']);
+  });
+});
+
+describe('brand identity', () => {
+  it('matches on brand id', () => {
+    expect(sameBrand(garment({ brandId: 'b1' }), garment({ brandId: 'b1' }))).toBe(true);
+  });
+
+  it('matches unrecognized brands on their raw text', () => {
+    expect(sameBrand(garment({ brandRaw: 'A.P.C.' }), garment({ brandRaw: 'apc' }))).toBe(true);
+  });
+
+  it('does NOT treat two unknown brands as the same brand', () => {
+    // The most common shape in a real closet is "no brand recorded". If that
+    // counted as a match, every unbranded top would be a duplicate of every
+    // other one.
+    expect(sameBrand(garment(), garment())).toBe(false);
+  });
+});
+
+describe('product URL normalization', () => {
+  it('ignores tracking parameters and cosmetic differences', () => {
+    expect(normalizeProductUrl('https://WWW.Shop.com/p/dress-123/?utm_source=ig&gclid=x')).toBe(
+      normalizeProductUrl('http://shop.com/p/dress-123'),
+    );
+  });
+
+  it('keeps parameters that identify the variant', () => {
+    // Plenty of retailers put the actual garment in a query parameter; dropping
+    // them all would merge a size 6 with a size 12.
+    expect(normalizeProductUrl('https://shop.com/p/dress?variant=6')).not.toBe(
+      normalizeProductUrl('https://shop.com/p/dress?variant=12'),
+    );
+  });
+
+  it('returns null for something that is not a URL', () => {
+    expect(normalizeProductUrl('dress-123')).toBeNull();
+  });
+
+  it('does not make two unparseable values look decisive', () => {
+    const a = garment({ productUrl: 'not a url' });
+    const b = garment({ productUrl: 'not a url' });
+    expect(signalsBetween(a, b)).not.toContain('product_url');
+  });
+});
+
+describe('decisive signals', () => {
+  it('short-circuits on a barcode, however it was transcribed', () => {
+    const match = compare(
+      garment({ barcode: '0 12345-67890 5' }),
+      garment({ barcode: '012345678905' }),
+    );
+    expect(match.signals).toContain('barcode');
+    expect(match.band).toBe('ask');
+  });
+
+  it('needs the retailer as well as the SKU', () => {
+    // A SKU is only unique within the retailer that issued it.
+    const withoutRetailer = signalsBetween(garment({ sku: 'AB-1' }), garment({ sku: 'ab1' }));
+    expect(withoutRetailer).not.toContain('sku_retailer');
+
+    const withRetailer = signalsBetween(
+      garment({ sku: 'AB-1', retailer: 'SSENSE' }),
+      garment({ sku: 'ab1', retailer: 'ssense' }),
+    );
+    expect(withRetailer).toContain('sku_retailer');
+  });
+
+  it('compares order lines only on sources that have orders', () => {
+    // Two camera captures sharing a local reference are not one purchase.
+    expect(
+      signalsBetween(
+        garment({ sourceType: 'camera', sourceReference: 'IMG_0001' }),
+        garment({ sourceType: 'camera', sourceReference: 'IMG_0001' }),
+      ),
+    ).not.toContain('order_line');
+
+    expect(
+      signalsBetween(
+        garment({ sourceType: 'email', sourceReference: 'order-99:line-2' }),
+        garment({ sourceType: 'email', sourceReference: 'order-99:line-2' }),
+      ),
+    ).toContain('order_line');
+  });
+});
+
+describe('scoring bands', () => {
+  const SAME_PHOTO = 'ffee00112233aabb';
+  const OTHER_PHOTO = '0011ffee5544ccdd';
+
+  it('asks softly on one strong signal, and never more than that', () => {
+    const score = combine(['image_hash']);
+    expect(score).toBeGreaterThanOrEqual(ASK_SOFTLY_THRESHOLD);
+    expect(score).toBeLessThan(ASK_THRESHOLD);
+    expect(bandFor(score)).toBe('ask_softly');
+  });
+
+  it('asks outright when two strong signals agree', () => {
+    expect(bandFor(combine(['image_hash', 'brand_name']))).toBe('ask');
+  });
+
+  it('does NOT interrupt on same brand, colour and size alone', () => {
+    // duplicate-detection.md §7 calls this the hard negative: same brand, same
+    // colour, different cut is exactly where a false merge is most damaging.
+    const score = combine(['category_color_size_brand']);
+    expect(score).toBeGreaterThanOrEqual(NOTE_THRESHOLD);
+    expect(score).toBeLessThan(ASK_SOFTLY_THRESHOLD);
+    expect(bandFor(score)).toBe('note');
+  });
+
+  it('never surfaces anything on purchase dates alone', () => {
+    expect(bandFor(combine(['purchase_window']))).toBe('ignore');
+  });
+
+  it('lets a weak signal support without deciding', () => {
+    const alone = combine(['category_color_size_brand']);
+    const supported = combine(['category_color_size_brand', 'purchase_window']);
+    expect(supported).toBeGreaterThan(alone);
+    expect(bandFor(supported)).toBe('note');
+  });
+
+  it('only ever raises the score as evidence accumulates', () => {
+    // Absent evidence is not evidence of difference.
+    let previous = 0;
+    const signals = ['purchase_window', 'category_color_size_brand', 'brand_name'] as const;
+    for (let i = 1; i <= signals.length; i += 1) {
+      const score = combine(signals.slice(0, i));
+      expect(score).toBeGreaterThan(previous);
+      previous = score;
+    }
+  });
+
+  it('shows the sheet for the spec’s worked example, worded softly', () => {
+    // "Aritzia Contour Bodysuit — Black" against "Aritzia Contour Crew
+    // Bodysuit — Black", the pair §4 puts in the sheet.
+    //
+    // It lands in `ask_softly`, not `ask`, and that is the point: both bands
+    // show the sheet and differ only in wording. A very similar name plus the
+    // same colour and size is precisely §7's hard case — "same brand, same
+    // colour, different cut" — where a confident question would nudge someone
+    // into merging two garments they own separately.
+    const existing = garment({
+      id: 'g1',
+      name: 'Contour Bodysuit',
+      brandRaw: 'Aritzia',
+      primaryColor: 'black',
+      sizeRaw: 'S',
+    });
+    const incoming = garment({
+      name: 'Aritzia Contour Crew Bodysuit',
+      brandRaw: 'Aritzia',
+      primaryColor: 'black',
+      sizeRaw: 's',
+    });
+
+    const match = compare(incoming, existing);
+    expect(match.signals).toContain('brand_name');
+    expect(match.signals).toContain('category_color_size_brand');
+    expect(match.band).toBe('ask_softly');
+    expect(match.summary).toBe('Same brand and a very similar name · Same brand, colour and size');
+  });
+
+  it('recognizes a re-uploaded photograph', () => {
+    const match = compare(
+      garment({ imageHashes: [SAME_PHOTO] }),
+      garment({ id: 'g1', imageHashes: [OTHER_PHOTO, SAME_PHOTO] }),
+    );
+    expect(match.signals).toContain('image_hash');
+  });
+
+  it('does not fire on unrelated photographs', () => {
+    expect(
+      signalsBetween(
+        garment({ imageHashes: [SAME_PHOTO] }),
+        garment({ imageHashes: [OTHER_PHOTO] }),
+      ),
+    ).not.toContain('image_hash');
+  });
+});
+
+describe('summaries', () => {
+  it('says what a person would say, not what the signal is called', () => {
+    expect(summarize(['brand_name'])).toBe('Same brand and a very similar name');
+  });
+
+  it('lets a decisive signal stand alone', () => {
+    expect(summarize(['purchase_window', 'barcode', 'brand_name'])).toBe('The same barcode');
+  });
+
+  it('leads with the strongest reason', () => {
+    expect(summarize(['purchase_window', 'brand_name'])).toBe(
+      'Same brand and a very similar name · Bought within a few days of each other',
+    );
+  });
+
+  it('is empty when nothing fired', () => {
+    expect(summarize([])).toBe('');
+  });
+});
+
+describe('scoring a closet', () => {
+  const incoming = garment({
+    name: 'Contour Bodysuit',
+    brandRaw: 'Aritzia',
+    primaryColor: 'black',
+    sizeRaw: 'S',
+  });
+
+  it('returns the strongest match first', () => {
+    const weak = garment({
+      id: 'weak',
+      brandRaw: 'Aritzia',
+      primaryColor: 'black',
+      sizeRaw: 'S',
+    });
+    const strong = garment({
+      id: 'strong',
+      name: 'Contour Crew Bodysuit',
+      brandRaw: 'Aritzia',
+      primaryColor: 'black',
+      sizeRaw: 'S',
+    });
+
+    const scored = scoreAgainst(incoming, [weak, strong]);
+    expect(scored.map((c) => c.garmentId)).toEqual(['strong', 'weak']);
+  });
+
+  it('skips a candidate it could not then show the user', () => {
+    // A match with no garment behind it would open a sheet with one picture.
+    expect(
+      scoreAgainst(incoming, [garment({ name: 'Contour Bodysuit', brandRaw: 'Aritzia' })]),
+    ).toEqual([]);
+  });
+
+  it('never matches a garment with itself', () => {
+    const self = { ...incoming, id: 'g1' };
+    expect(scoreAgainst(self, [self])).toEqual([]);
+  });
+
+  it('drops everything below the noticing threshold', () => {
+    const unrelated = garment({ id: 'other', name: 'Wool Coat', brandRaw: 'Toteme' });
+    expect(scoreAgainst(incoming, [unrelated])).toEqual([]);
+  });
+});

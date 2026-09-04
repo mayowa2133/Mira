@@ -309,3 +309,105 @@ Format:
   stated fields rather than a mean, so one confident category cannot disguise a
   weak brand. Nothing is lost either way: every value the model produced is in
   `garment_attributes` for evaluation and for comparison against a later model.
+
+## D-023 — Duplicate signal weights are derived from the thresholds
+
+- **Date:** 2026-09-04 · **Status:** Accepted
+- **Decision:** each non-decisive signal in `duplicate-detection.md` §2 is
+  weighted at exactly the score it should reach **on its own**, and the weights
+  are combined with noisy-OR (`1 − Π(1 − wᵢ)`): strong 0.72, moderate 0.55, weak
+  0.15. A decisive signal short-circuits to 0.99.
+- **Why:** §2 says "a weighted combination" and §3 gives the thresholds, but
+  neither gives numbers, and numbers invented to feel right are numbers nobody
+  can argue with later. Reading them off the thresholds makes each one a
+  statement about behaviour instead: a strong signal alone must show the sheet
+  softly, so it is 0.72, above 0.70 and below 0.90. A moderate signal alone must
+  **not** interrupt — §7 names "same brand, same colour, different cut" as the
+  case where a false merge does the most damage — so it is 0.55, inside the
+  quiet band. A weak signal is "supporting only", so at 0.15 it can never
+  surface anything by itself.
+- **Consequences:** the thresholds are the specification and the weights follow
+  from them, so moving a threshold moves the weights rather than contradicting
+  them. Noisy-OR keeps every signal monotonic — evidence can only ever raise a
+  score — and saturating, so two strong signals compound into `ask` (0.922)
+  without any weight needing to be clamped. Visual embedding similarity is
+  moderate when Phase 5 supplies it, which is what "never sufficient alone"
+  means as behaviour rather than as prose: alone it reaches `note` and asks
+  nothing.
+
+## D-024 — `duplicate_unresolved` carries ids, not the sheet
+
+- **Date:** 2026-09-04 · **Status:** Accepted
+- **Decision:** `POST /garments` refuses with 409 `duplicate_unresolved` when an
+  interrupting candidate exists and no `duplicate_resolution` was supplied, and
+  the response lists candidate ids and summaries in `details` — not hydrated
+  garments.
+- **Why:** the error body in `error-contract.md` is one shape for every non-2xx
+  response, and widening it so one code can carry garments would make the
+  contract answer "it depends". The client that shows the sheet has already
+  called `check-duplicate`, which returns hydrated garments with imagery,
+  because §4 shows both pieces as pictures. The 409 exists for the client that
+  did not — a safety net, not the path.
+- **Consequences:** a client that ignores `check-duplicate` needs a second call
+  to render the sheet. That is the right cost to put on the wrong order.
+
+## D-025 — A create-time merge fills gaps and never overwrites
+
+- **Date:** 2026-09-04 · **Status:** Accepted
+- **Decision:** answering the duplicate sheet with "It's the same item" copies
+  onto the surviving garment only the fields it has **no value for**, records a
+  `garment_sources` row describing the merge, and creates nothing.
+- **Why:** §5's headline is "merging never destroys information". The full
+  precedence rule in `garment-understanding.md` §3 resolves per field by source,
+  which needs each field's source from `garment_attributes` — and today the only
+  sources that can meet at a create-time merge are the user and vision
+  inference, where that rule already says the existing value stands. Filling
+  gaps is a strict subset of the rule, conservative in the direction that
+  matters.
+- **Consequences:** merging a receipt into a garment that already has a wrong
+  price keeps the wrong price. Tag OCR (Phase 4) and product matching (3.7) are
+  the sources that will make precedence genuinely matter; the full per-field
+  merge lands with them. No `garment_duplicates` row is written for this merge,
+  because there is only ever one garment — the pair table records pairs that
+  still exist.
+
+## D-026 — The photo path meets CAP-5 after analysis, not at capture
+
+- **Date:** 2026-09-04 · **Status:** Accepted
+- **Decision:** `POST /imports/photo` does not run weighted duplicate detection.
+  It keeps its exact perceptual-hash guard against the same bytes arriving
+  twice, and the weighted check runs later — once analysis has given the garment
+  something to compare — surfacing as "You might already own this" (§26) rather
+  than as a sheet.
+- **Why:** at capture a photo import has a category of `other` and no brand, no
+  name, no colour and no hash, because the hash is computed by the worker. There
+  is nothing to weigh. Blocking the capture on a check that cannot see anything
+  would cost the sub-second tile in PERF-3 and find nothing.
+- **Consequences:** CAP-5 is met on this path by a different surface from the
+  manual and receipt paths, and this should be read as a documented difference
+  rather than as coverage. A near-identical — not byte-identical — re-photograph
+  of an owned garment becomes a second garment until the user is shown the pair
+  while browsing.
+
+## D-027 — `openapi.yaml` is reconciled to `duplicate-detection.md`, not the reverse
+
+- **Date:** 2026-09-04 · **Status:** Accepted
+- **Decision:** three duplicate-related shapes in `openapi.yaml` predated the
+  detail in `duplicate-detection.md` and could not express it. They are changed
+  to match it: `DuplicateCheckRequest` becomes the create payload (it had no
+  size, no retailer to make a SKU decisive, and no source reference to recognize
+  a re-imported order line); `duplicate_resolution` becomes
+  `{ garment_id, relation }` (it was a bare enum with no way to name *which*
+  garment, and no `same_item`, so the merge §5 defines could not be requested);
+  and `DuplicateCandidate.signals` takes one name per row of §2, plus `band` and
+  `summary`.
+- **Why:** `api-contract.md` already said the check "accepts the same payload a
+  create would", so the two API documents disagreed with each other before any
+  code existed. Where they disagree, the document that describes the *behaviour*
+  wins over the one that describes a shape — a shape that cannot carry the
+  signals is not a smaller version of the contract, it is a different one.
+- **Consequences:** `existing_garment` is kept as the response field name
+  because `openapi.yaml` named it first and nothing about it was wrong.
+  `packages/types` regenerates from the spec, so the mobile client sees the
+  corrected shapes without hand-editing — which is what caught the last
+  contract drift, where a mobile type had been written to match a bug.

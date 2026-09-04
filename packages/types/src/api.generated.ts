@@ -246,6 +246,15 @@ export interface paths {
                 };
             };
             responses: {
+                /** @description Merged into an existing garment. Nothing was created, so the client must not add a second tile for a piece it is already showing. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Garment"];
+                    };
+                };
                 /** @description Created */
                 201: {
                     headers: {
@@ -1883,11 +1892,7 @@ export interface components {
             image_upload_keys?: string[];
             tags_attached?: boolean | null;
             notes?: string | null;
-            /**
-             * @default none
-             * @enum {string}
-             */
-            duplicate_resolution: "none" | "owns_two" | "different";
+            duplicate_resolution?: components["schemas"]["DuplicateResolution"];
         };
         GarmentUpdate: components["schemas"]["GarmentCreate"] & Record<string, unknown>;
         GarmentPage: {
@@ -1935,22 +1940,20 @@ export interface components {
             barcode?: string | null;
             confidence?: number;
         };
-        DuplicateCheckRequest: {
-            sku?: string | null;
-            barcode?: string | null;
-            product_url?: string | null;
-            brand?: string | null;
-            name?: string | null;
-            category?: string | null;
-            primary_color?: string | null;
-            /** Format: date */
-            purchase_date?: string | null;
-            image_upload_key?: string | null;
-        };
+        DuplicateCheckRequest: components["schemas"]["GarmentCreate"];
         DuplicateCandidate: {
             existing_garment?: components["schemas"]["Garment"];
             score?: number;
-            signals?: ("sku" | "barcode" | "product_url" | "order" | "visual" | "name" | "date")[];
+            /** @enum {string} */
+            band?: "ask" | "ask_softly" | "note";
+            summary?: string;
+            signals?: ("barcode" | "sku_retailer" | "product_url" | "order_line" | "image_hash" | "visual_similarity" | "brand_name" | "category_color_size_brand" | "purchase_window")[];
+        };
+        DuplicateResolution: {
+            /** Format: uuid */
+            garment_id: string;
+            /** @enum {string} */
+            relation: "same_item" | "owns_two" | "different";
         };
         Import: {
             /** Format: uuid */

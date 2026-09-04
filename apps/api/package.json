@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@mira/ai": "*",
+    "@mira/duplicates": "*",
     "@mira/imaging": "*",
     "@mira/storage": "*",
     "@mira/taxonomy": "*",

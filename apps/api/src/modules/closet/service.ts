@@ -14,7 +14,7 @@ import {
   type GarmentStatus,
 } from '@mira/taxonomy';
 import type { UserScope } from '../../db/scope.js';
-import { ApiError, ErrorCode, notFound, validationFailed } from '../../http/errors.js';
+import { ApiError, ErrorCode, internal, notFound, validationFailed } from '../../http/errors.js';
 import type { StorageDriver } from '@mira/storage';
 import {
   GarmentRepository,
@@ -26,6 +26,12 @@ import {
   type UpdateGarmentInput,
 } from './repository.js';
 import { validateFilters, type GarmentFilters, type SortKey } from './filters.js';
+import {
+  interrupts,
+  type DuplicateCandidateView,
+  type DuplicateService,
+} from './duplicate-service.js';
+import { subjectFromInput } from './duplicate-subject.js';
 
 export type SerializedGarment = ReturnType<typeof serializeGarmentSync>;
 
@@ -196,11 +202,28 @@ function correctionsFrom(input: UpdateGarmentInput): { field: string; value: unk
   return out;
 }
 
+/** The user's answer to the duplicate sheet (`duplicate-detection.md` §4). */
+export type DuplicateResolution = {
+  garmentId: string;
+  relation: 'same_item' | 'owns_two' | 'different';
+};
+
 export class ClosetService {
   constructor(
     private readonly repo: GarmentRepository,
     private readonly storage: StorageDriver,
+    /**
+     * Absent only where there is no closet to compare against — the tests that
+     * exercise serialization on its own. Every real path has it, because CAP-5
+     * makes the check part of creating a garment rather than a step beside it.
+     */
+    private readonly duplicates: DuplicateService | null = null,
   ) {}
+
+  /** Sign and shape rows the caller already has. */
+  async serializeRows(scope: UserScope, rows: GarmentRow[]): Promise<SerializedGarment[]> {
+    return this.serialize(scope, rows);
+  }
 
   /** Sign every image URL for a page of garments in one pass. */
   private async serialize(scope: UserScope, rows: GarmentRow[]) {
@@ -224,12 +247,8 @@ export class ClosetService {
             // private as the photograph it came from (SEC-4).
             const [signed, thumb, medium] = await Promise.all([
               this.storage.signedReadUrl(image.storage_key, scope.userId),
-              image.thumb_key
-                ? this.storage.signedReadUrl(image.thumb_key, scope.userId)
-                : null,
-              image.medium_key
-                ? this.storage.signedReadUrl(image.medium_key, scope.userId)
-                : null,
+              image.thumb_key ? this.storage.signedReadUrl(image.thumb_key, scope.userId) : null,
+              image.medium_key ? this.storage.signedReadUrl(image.medium_key, scope.userId) : null,
             ]);
 
             return {
@@ -308,6 +327,10 @@ export class ClosetService {
     // is a 404 rather than a 403 (SEC-5, docs/05-api/error-contract.md).
     if (!row) throw notFound(ErrorCode.garmentNotFound);
     const [serialized] = await this.serialize(scope, [row]);
+    // One row in, one out. The index is only optional to the type system, and
+    // leaving it that way made every caller's return type nullable for a case
+    // that cannot happen.
+    if (!serialized) throw internal();
     return serialized;
   }
 
@@ -340,6 +363,182 @@ export class ClosetService {
     }
 
     return this.get(scope, row.id);
+  }
+
+  /**
+   * What this payload might already be, without creating anything.
+   *
+   * Every band is returned, `note` included, because the caller that shows the
+   * sheet and the caller that quietly records "you might already own this" are
+   * asking the same question and should not each re-derive the thresholds.
+   */
+  async checkDuplicates(
+    scope: UserScope,
+    input: Omit<CreateGarmentInput, 'closetId'>,
+  ): Promise<DuplicateCandidateView[]> {
+    this.assertTaxonomy(input.category, input.subcategory);
+    if (!this.duplicates) return [];
+    return this.duplicates.check(scope, subjectFromInput(input));
+  }
+
+  /**
+   * Create a garment, having first asked whether it is already in the closet.
+   *
+   * CAP-5: duplicate detection runs before every garment creation, from every
+   * ingestion path. It runs here rather than in the route so that no path can
+   * reach `create` without passing through it.
+   *
+   * Without a resolution, a candidate in an interrupting band stops the save
+   * with `duplicate_unresolved` (409). That is a safety net rather than the
+   * normal flow: a client is expected to call `check-duplicate` first and show
+   * the sheet, which is why the 409 carries only the candidate ids and not the
+   * whole sheet — the path that needs the images has already fetched them.
+   */
+  async createChecked(
+    scope: UserScope,
+    closetId: string,
+    input: Omit<CreateGarmentInput, 'closetId'>,
+    resolution: DuplicateResolution | null,
+  ): Promise<{ garment: SerializedGarment; created: boolean }> {
+    this.assertTaxonomy(input.category, input.subcategory);
+
+    const candidates = this.duplicates
+      ? await this.duplicates.check(scope, subjectFromInput(input))
+      : [];
+
+    if (!resolution) {
+      const asking = candidates.filter((candidate) => interrupts(candidate.band));
+      if (asking.length > 0) {
+        throw new ApiError(409, ErrorCode.duplicateUnresolved, {
+          details: asking.map((candidate) => ({
+            field: 'duplicate_resolution',
+            issue: `${candidate.existing_garment.id}: ${candidate.summary}`,
+          })),
+        });
+      }
+      return { garment: await this.create(scope, closetId, input), created: true };
+    }
+
+    // The sheet only ever offers candidates, but a resolution is honoured for
+    // any garment the user owns: between showing the sheet and answering it,
+    // the closet can change, and rejecting an answer the user actually gave is
+    // worse than merging into a garment that stopped scoring.
+    const target = await this.repo.findById(scope, resolution.garmentId);
+    if (!target) throw notFound(ErrorCode.garmentNotFound);
+
+    const score = candidates.find((c) => c.existing_garment.id === resolution.garmentId)?.score ?? null;
+
+    if (resolution.relation === 'same_item') {
+      return { garment: await this.mergeInto(scope, target, input), created: false };
+    }
+
+    const garment = await this.create(scope, closetId, input);
+
+    // Both remaining answers are the user saying "these are two garments". The
+    // negative is recorded as carefully as the positive: §7 measures precision
+    // against it, and without it a false-duplicate rate cannot be computed.
+    if (this.duplicates) {
+      await this.duplicates.record(scope, {
+        garmentA: garment.id,
+        garmentB: target.id,
+        relation: resolution.relation,
+        score,
+      });
+    }
+
+    return { garment, created: true };
+  }
+
+  /**
+   * Fold a garment that was never created into the one it duplicates.
+   *
+   * §5: "Merging never destroys information." So this only fills fields the
+   * surviving garment has nothing in — it never overwrites a value that is
+   * already there.
+   *
+   * That is narrower than the full precedence rule in
+   * `garment-understanding.md` §3, deliberately. Resolving precedence per field
+   * needs each field's source, which lives in `garment_attributes`; and today
+   * the only sources that can meet here are the user and vision inference,
+   * where the rule already says the existing value stands. Tag OCR and product
+   * matching are the sources that will make precedence matter, and they arrive
+   * with Phase 4 and 3.7 (D-025).
+   */
+  private async mergeInto(
+    scope: UserScope,
+    target: GarmentRow,
+    input: Omit<CreateGarmentInput, 'closetId'>,
+  ): Promise<SerializedGarment> {
+    const patch: UpdateGarmentInput = {};
+
+    const fill = <K extends keyof UpdateGarmentInput>(
+      key: K,
+      existing: unknown,
+      incoming: UpdateGarmentInput[K],
+    ) => {
+      const empty =
+        existing === null ||
+        existing === undefined ||
+        (Array.isArray(existing) && existing.length === 0);
+      const hasIncoming =
+        incoming !== null &&
+        incoming !== undefined &&
+        !(Array.isArray(incoming) && incoming.length === 0);
+      if (empty && hasIncoming) patch[key] = incoming;
+    };
+
+    fill('name', target.name, input.name);
+    fill('brandRaw', target.brand_raw ?? target.brand_id, input.brandRaw);
+    fill('primaryColor', target.primary_color, input.primaryColor);
+    fill('secondaryColors', target.secondary_colors, input.secondaryColors);
+    fill('pattern', target.pattern, input.pattern);
+    fill('materials', target.materials, input.materials);
+    fill('sizeRaw', target.size_raw, input.sizeRaw);
+    fill('sizeNormalized', target.size_normalized, input.sizeNormalized);
+    fill('sizeSystem', target.size_system, input.sizeSystem);
+    fill('fit', target.fit, input.fit);
+    fill('season', target.season, input.season);
+    fill('occasion', target.occasion, input.occasion);
+    fill('styleTags', target.style_tags, input.styleTags);
+    fill('purchaseDate', target.purchase_date, input.purchaseDate);
+    fill('retailer', target.retailer, input.retailer);
+    fill('sku', target.sku, input.sku);
+    fill('barcode', target.barcode, input.barcode);
+    fill('productUrl', target.product_url, input.productUrl);
+    fill('tagsAttached', target.tags_attached, input.tagsAttached);
+    fill('notes', target.notes, input.notes);
+
+    // Price and currency move together or not at all: the schema refuses a
+    // price without a currency, and half a purchase record is worse than none.
+    if (target.purchase_price === null && input.purchasePrice !== null && input.currency) {
+      patch.purchasePrice = input.purchasePrice;
+      patch.currency = input.currency;
+    }
+
+    // A subcategory only means anything under its own category.
+    if (!target.subcategory && input.subcategory && target.category === input.category) {
+      patch.subcategory = input.subcategory;
+    }
+
+    if (Object.keys(patch).length > 0) {
+      await this.repo.update(scope, target.id, patch);
+      if (patch.brandRaw) {
+        const brand = await this.repo.resolveBrand(patch.brandRaw);
+        if (brand) await this.repo.attachBrand(scope, target.id, brand.id);
+      }
+    }
+
+    // How the extra information arrived is provenance, and provenance is
+    // append-only (CAP-3). Without this row the merge is invisible: the garment
+    // would carry a receipt's price with no record of the receipt.
+    await this.repo.recordSource(scope, target.id, {
+      sourceType: input.sourceType,
+      referenceId: input.sourceReference,
+      referenceKind: 'merged_duplicate',
+      metadata: { fields: Object.keys(patch) },
+    });
+
+    return this.get(scope, target.id);
   }
 
   async update(scope: UserScope, id: string, input: UpdateGarmentInput) {

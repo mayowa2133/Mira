@@ -17,6 +17,8 @@ import type { TokenVerifier } from '../modules/identity/verify.js';
 import { registerHealthRoutes } from '../modules/health/routes.js';
 import { registerIdentityRoutes } from '../modules/identity/routes.js';
 import { registerClosetRoutes } from '../modules/closet/routes.js';
+import { DuplicateRepository } from '../modules/closet/duplicate-repository.js';
+import { DuplicateService } from '../modules/closet/duplicate-service.js';
 import { registerMediaRoutes } from '../modules/media/routes.js';
 import { registerImportRoutes } from '../modules/imports/routes.js';
 import { ImportsRepository } from '../modules/imports/repository.js';
@@ -209,8 +211,19 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
       const garments = new GarmentRepository(pool);
       const identity = new IdentityRepository(pool);
 
+      // The duplicate service serializes through the closet service, and the
+      // closet service checks through the duplicate service. The knot is tied
+      // here rather than by making either one reach for the other at call time.
+      const closet: ClosetService = new ClosetService(
+        garments,
+        storage,
+        new DuplicateService(new DuplicateRepository(pool), (scope, rows) =>
+          closet.serializeRows(scope, rows),
+        ),
+      );
+
       await registerClosetRoutes(instance, {
-        service: new ClosetService(garments, storage),
+        service: closet,
         identity,
       });
       await registerMediaRoutes(instance, { storage });
@@ -225,7 +238,12 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
 
       const importsRepository = new ImportsRepository(pool);
       await registerImportRoutes(instance, {
-        service: new ImportsService(importsRepository, garments, storage, options.queue ?? tableQueue(logger)),
+        service: new ImportsService(
+          importsRepository,
+          garments,
+          storage,
+          options.queue ?? tableQueue(logger),
+        ),
         repository: importsRepository,
         identity,
       });

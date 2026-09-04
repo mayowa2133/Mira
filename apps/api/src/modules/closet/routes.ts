@@ -118,6 +118,23 @@ const GarmentBodySchema = z.object({
 
 const GarmentUpdateSchema = GarmentBodySchema.partial();
 
+/**
+ * The user's answer to the duplicate sheet (`duplicate-detection.md` §4).
+ *
+ * `same_item` merges into the named garment and creates nothing; the other two
+ * both create, and differ only in what they record about the pair — which is
+ * the whole point, because `different` is the negative that makes precision
+ * measurable (§7).
+ */
+const DuplicateResolutionSchema = z.object({
+  garment_id: z.string().uuid(),
+  relation: z.enum(['same_item', 'owns_two', 'different']),
+});
+
+const CreateGarmentSchema = GarmentBodySchema.extend({
+  duplicate_resolution: DuplicateResolutionSchema.optional(),
+});
+
 function parseBody<T>(schema: z.ZodType<T>, body: unknown): T {
   const result = schema.safeParse(body);
   if (!result.success) {
@@ -129,6 +146,47 @@ function parseBody<T>(schema: z.ZodType<T>, body: unknown): T {
     );
   }
   return result.data;
+}
+
+type GarmentBody = z.infer<typeof GarmentBodySchema>;
+
+/**
+ * The create payload, in the service's shape.
+ *
+ * Shared by `POST /garments` and `POST /garments/check-duplicate` because the
+ * contract says the check "accepts the same payload a create would" — and a
+ * check that read one field differently from the create that follows it would
+ * clear a garment it then went on to duplicate.
+ */
+function toCreateInput(body: GarmentBody) {
+  return {
+    name: body.name ?? null,
+    brandRaw: body.brand_raw ?? null,
+    category: body.category,
+    subcategory: body.subcategory ?? null,
+    primaryColor: body.primary_color ?? null,
+    secondaryColors: body.secondary_colors ?? [],
+    pattern: body.pattern ?? null,
+    materials: body.materials ?? [],
+    sizeRaw: body.size_raw ?? null,
+    sizeNormalized: body.size_normalized ?? null,
+    sizeSystem: body.size_system ?? null,
+    fit: body.fit ?? null,
+    season: body.season ?? [],
+    occasion: body.occasion ?? [],
+    styleTags: body.style_tags ?? [],
+    purchaseDate: body.purchase_date ?? null,
+    purchasePrice: body.purchase_price ?? null,
+    currency: body.currency ?? null,
+    retailer: body.retailer ?? null,
+    sku: body.sku ?? null,
+    barcode: body.barcode ?? null,
+    productUrl: body.product_url ?? null,
+    sourceType: body.source_type ?? 'manual',
+    sourceReference: body.source_reference ?? null,
+    tagsAttached: body.tags_attached ?? null,
+    notes: body.notes ?? null,
+  };
 }
 
 export type ClosetRouteDeps = {
@@ -179,42 +237,43 @@ export async function registerClosetRoutes(
       });
     }
 
-    const body = parseBody(GarmentBodySchema, request.body);
+    const body = parseBody(CreateGarmentSchema, request.body);
     const scope = requireScope(request);
 
     const closet =
       (await identity.findDefaultCloset(scope)) ?? (await identity.createDefaultCloset(scope));
 
-    const garment = await service.create(scope, closet.id, {
-      name: body.name ?? null,
-      brandRaw: body.brand_raw ?? null,
-      category: body.category,
-      subcategory: body.subcategory ?? null,
-      primaryColor: body.primary_color ?? null,
-      secondaryColors: body.secondary_colors ?? [],
-      pattern: body.pattern ?? null,
-      materials: body.materials ?? [],
-      sizeRaw: body.size_raw ?? null,
-      sizeNormalized: body.size_normalized ?? null,
-      sizeSystem: body.size_system ?? null,
-      fit: body.fit ?? null,
-      season: body.season ?? [],
-      occasion: body.occasion ?? [],
-      styleTags: body.style_tags ?? [],
-      purchaseDate: body.purchase_date ?? null,
-      purchasePrice: body.purchase_price ?? null,
-      currency: body.currency ?? null,
-      retailer: body.retailer ?? null,
-      sku: body.sku ?? null,
-      barcode: body.barcode ?? null,
-      productUrl: body.product_url ?? null,
-      sourceType: body.source_type ?? 'manual',
-      sourceReference: body.source_reference ?? null,
-      tagsAttached: body.tags_attached ?? null,
-      notes: body.notes ?? null,
-    });
+    const { garment, created } = await service.createChecked(
+      scope,
+      closet.id,
+      toCreateInput(body),
+      body.duplicate_resolution
+        ? {
+            garmentId: body.duplicate_resolution.garment_id,
+            relation: body.duplicate_resolution.relation,
+          }
+        : null,
+    );
 
-    return reply.status(201).send(garment);
+    // A merge did not create anything — it added to a garment that was already
+    // there. 201 would tell the client to insert a second tile for a piece it
+    // is already showing.
+    return reply.status(created ? 201 : 200).send(garment);
+  });
+
+  /**
+   * Is this already in the closet?
+   *
+   * Called by every ingestion path before writing (CAP-5,
+   * `docs/05-api/api-contract.md`). Returns everything Mira noticed, including
+   * the quiet band that does not interrupt a save — `band` says what to do with
+   * each, so the caller never has to know the thresholds.
+   */
+  app.post('/garments/check-duplicate', { onRequest: requireAuth }, async (request) => {
+    const body = parseBody(GarmentBodySchema, request.body);
+    return {
+      candidates: await service.checkDuplicates(requireScope(request), toCreateInput(body)),
+    };
   });
 
   app.get('/garments/:id', { onRequest: requireAuth }, async (request) => {

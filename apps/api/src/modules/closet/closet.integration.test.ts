@@ -151,12 +151,23 @@ const validGarment = {
   retailer: 'Zara',
 };
 
+/**
+ * Distinct names, because these tests are not about duplicates.
+ *
+ * Every one of them used to post the identical "Zara Satin Midi Dress", which
+ * duplicate detection now — correctly — stops to ask about (CAP-5). Naming each
+ * garment separately keeps the signal that fires down to "same brand, colour
+ * and size", which is the `note` band: recorded, never an interruption.
+ */
+let nextGarment = 0;
+
 async function createGarment(subject: string, overrides: Record<string, unknown> = {}) {
+  nextGarment += 1;
   const res = await app!.inject({
     method: 'POST',
     url: '/v1/garments',
     headers: await auth(subject),
-    payload: { ...validGarment, ...overrides },
+    payload: { ...validGarment, name: `Satin Midi Dress ${nextGarment}`, ...overrides },
   });
   return res;
 }

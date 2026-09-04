@@ -161,12 +161,23 @@ paths:
             schema:
               $ref: '#/components/schemas/GarmentCreate'
       responses:
+        '200':
+          description: >-
+            Merged into an existing garment. Nothing was created, so the client
+            must not add a second tile for a piece it is already showing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Garment'
         '201':
           description: Created
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Garment'
+        # duplicate_unresolved — this may already be in the closet. `details`
+        # names each candidate; call check-duplicate for the imagery the sheet
+        # needs (D-024).
         '409':
           $ref: '#/components/responses/Conflict'
         '422':
@@ -1141,10 +1152,16 @@ components:
         image_upload_keys: { type: array, items: { type: string } }
         tags_attached: { type: boolean, nullable: true }
         notes: { type: string, nullable: true }
+        # The user's answer to the duplicate sheet (duplicate-detection.md §4).
+        # Omit it and a create that would duplicate is refused with 409
+        # duplicate_unresolved (CAP-5).
+        #
+        # This was a bare enum of [none, owns_two, different], which could not
+        # express §4: it had no way to name WHICH garment — ambiguous the moment
+        # there is more than one candidate — and no `same_item`, so the merge
+        # that §5 spends a section defining had no way to be requested.
         duplicate_resolution:
-          type: string
-          enum: [none, owns_two, different]
-          default: none
+          $ref: '#/components/schemas/DuplicateResolution'
 
     GarmentUpdate:
       allOf:
@@ -1212,29 +1229,51 @@ components:
         barcode: { type: string, nullable: true }
         confidence: { type: number, minimum: 0, maximum: 1 }
 
+    # The same payload a create would take (api-contract.md). The subset this
+    # schema used to describe could not express the signals in
+    # duplicate-detection.md §2 — it had no size, no retailer to make a SKU
+    # decisive, and no source reference to recognize a re-imported order line.
     DuplicateCheckRequest:
-      type: object
-      properties:
-        sku: { type: string, nullable: true }
-        barcode: { type: string, nullable: true }
-        product_url: { type: string, nullable: true }
-        brand: { type: string, nullable: true }
-        name: { type: string, nullable: true }
-        category: { type: string, nullable: true }
-        primary_color: { type: string, nullable: true }
-        purchase_date: { type: string, format: date, nullable: true }
-        image_upload_key: { type: string, nullable: true }
+      $ref: '#/components/schemas/GarmentCreate'
 
     DuplicateCandidate:
       type: object
       properties:
         existing_garment: { $ref: '#/components/schemas/Garment' }
         score: { type: number, minimum: 0, maximum: 1 }
+        # What to do, so a client never has to know the thresholds in §3.
+        # `ask` and `ask_softly` show the sheet; `note` is recorded quietly and
+        # surfaced later in wardrobe insights.
+        band:
+          type: string
+          enum: [ask, ask_softly, note]
+        # One line for the sheet: "Same brand and a very similar name" (§4).
+        summary: { type: string }
+        # One name per row of duplicate-detection.md §2. `visual_similarity`
+        # arrives with Phase 5 embeddings; the rest are computed today.
         signals:
           type: array
           items:
             type: string
-            enum: [sku, barcode, product_url, order, visual, name, date]
+            enum:
+              - barcode
+              - sku_retailer
+              - product_url
+              - order_line
+              - image_hash
+              - visual_similarity
+              - brand_name
+              - category_color_size_brand
+              - purchase_window
+
+    DuplicateResolution:
+      type: object
+      required: [garment_id, relation]
+      properties:
+        garment_id: { type: string, format: uuid }
+        relation:
+          type: string
+          enum: [same_item, owns_two, different]
 
     Import:
       type: object

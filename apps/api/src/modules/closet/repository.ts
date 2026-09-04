@@ -139,7 +139,6 @@ export const CORRECTABLE_FIELDS: Record<string, keyof UpdateGarmentInput> = {
   size: 'sizeRaw',
 };
 
-
 export type ListParams = {
   filters: GarmentFilters;
   sort: SortKey;
@@ -155,7 +154,7 @@ export type ListResult = { rows: GarmentRow[]; nextCursor: string | null };
  * `brand_name` is joined rather than denormalized: brands are global, and a
  * brand rename should not require touching every garment.
  */
-const GARMENT_COLUMNS = `
+export const GARMENT_COLUMNS = `
   g.id, g.user_id, g.closet_id, g.name, g.brand_id, g.brand_raw, b.name as brand_name,
   g.category, g.subcategory, g.primary_color, g.secondary_colors, g.pattern, g.materials,
   g.size_raw, g.size_normalized, g.size_system, g.fit,
@@ -289,6 +288,40 @@ export class GarmentRepository {
       [scope.userId, id],
     );
     return rows[0] ?? null;
+  }
+
+  /**
+   * Append a provenance row.
+   *
+   * `garment_sources` is append-only at the database (CAP-3), so this is the
+   * only way anything is ever recorded about how a garment came to be — an
+   * update would be refused by a trigger.
+   */
+  async recordSource(
+    scope: UserScope,
+    garmentId: string,
+    input: {
+      sourceType: string;
+      referenceId: string | null;
+      referenceKind: string | null;
+      metadata?: Record<string, unknown>;
+    },
+  ): Promise<void> {
+    await scopedQuery(
+      this.db,
+      scope,
+      `insert into garment_sources
+         (garment_id, user_id, source_type, reference_id, reference_kind, metadata)
+       values ($2, $1, $3, $4, $5, $6)`,
+      [
+        scope.userId,
+        garmentId,
+        input.sourceType,
+        input.referenceId,
+        input.referenceKind,
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
   }
 
   async imagesFor(scope: UserScope, garmentIds: string[]): Promise<GarmentImageRow[]> {
