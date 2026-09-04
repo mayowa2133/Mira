@@ -492,3 +492,190 @@ describe('GET /outfits/:id', () => {
     expect(response.statusCode).toBe(404);
   });
 });
+
+describe('wardrobe insights (Phase 9)', () => {
+  /** A closet big enough for insights to be allowed to speak. */
+  async function stockedCloset(count: number): Promise<string[]> {
+    const userId = await userIdOf(ALICE);
+    const ids: string[] = [];
+    for (let i = 0; i < count; i += 1) {
+      const { rows } = await pool!.query<{ id: string }>(
+        `insert into garments (user_id, closet_id, category, source_type, analysis_state,
+                               purchase_price, currency, created_at)
+         values ($1, (select id from closets where user_id = $1 limit 1), 'tops', 'manual',
+                 'skipped', 40, 'GBP', now() - interval '200 days')
+         returning id`,
+        [userId],
+      );
+      ids.push(rows[0]!.id);
+    }
+    return ids;
+  }
+
+  dbIt('says nothing at all about a new closet', async () => {
+    await stockedCloset(3);
+
+    const response = await app!.inject({
+      method: 'GET',
+      url: '/v1/wardrobe/insights',
+      headers: { authorization: `Bearer ${await token(ALICE)}` },
+    });
+
+    // Telling someone who joined last week that they never wear their clothes
+    // is useless and faintly rude.
+    expect(response.json().data).toEqual([]);
+  });
+
+  dbIt('reports never-worn pieces once the closet is big enough', async () => {
+    await stockedCloset(15);
+
+    const response = await app!.inject({
+      method: 'GET',
+      url: '/v1/wardrobe/insights?kinds=never_worn',
+      headers: { authorization: `Bearer ${await token(ALICE)}` },
+    });
+
+    const insight = response.json().data[0];
+    expect(insight.kind).toBe('never_worn');
+    expect(insight.headline).toBe("You've never worn these 👀");
+    expect(insight.garments.length).toBeGreaterThan(1);
+  });
+
+  dbIt('separates forgotten from never worn', async () => {
+    const ids = await stockedCloset(15);
+    const userId = await userIdOf(ALICE);
+
+    // Two pieces worn, but long ago.
+    for (const id of ids.slice(0, 2)) {
+      await pool!.query(
+        `insert into wear_events (user_id, garment_id, worn_on)
+         values ($1, $2, current_date - 200)`,
+        [userId, id],
+      );
+    }
+
+    const response = await app!.inject({
+      method: 'GET',
+      url: '/v1/wardrobe/insights?kinds=forgotten,never_worn',
+      headers: { authorization: `Bearer ${await token(ALICE)}` },
+    });
+
+    const insights = response.json().data as {
+      kind: string;
+      total: number;
+      headline: string;
+      garments: unknown[];
+    }[];
+    const byKind = Object.fromEntries(insights.map((i) => [i.kind, i.garments]));
+
+    // The headline counts everything that qualifies; the rail is a preview.
+    // Reporting the rail length understates it, and more so the more there is
+    // to say.
+    const neverWorn = insights.find((i) => i.kind === 'never_worn');
+    expect(neverWorn?.total).toBe(13);
+    expect(neverWorn?.garments).toHaveLength(12);
+
+    // "I forgot about this" and "I never wore this" are different feelings.
+    expect(byKind['forgotten']).toHaveLength(2);
+    // Capped at a rail's worth: an insight is content, not a list of
+    // everything that qualifies.
+    expect(byKind['never_worn']).toHaveLength(12);
+  });
+
+  dbIt('needs real wear before naming a most-loved piece', async () => {
+    const ids = await stockedCloset(15);
+    const userId = await userIdOf(ALICE);
+
+    await pool!.query(
+      `insert into wear_events (user_id, garment_id, worn_on) values ($1, $2, current_date)`,
+      [userId, ids[0]],
+    );
+
+    const once = await app!.inject({
+      method: 'GET',
+      url: '/v1/wardrobe/insights?kinds=most_loved',
+      headers: { authorization: `Bearer ${await token(ALICE)}` },
+    });
+    // One wear does not make a favourite; it makes a Tuesday.
+    expect(once.json().data).toEqual([]);
+
+    for (const day of [1, 2, 3]) {
+      await pool!.query(
+        `insert into wear_events (user_id, garment_id, worn_on)
+         values ($1, $2, current_date - ($3 || ' days')::interval)`,
+        [userId, ids[0], String(day)],
+      );
+    }
+
+    const now = await app!.inject({
+      method: 'GET',
+      url: '/v1/wardrobe/insights?kinds=most_loved',
+      headers: { authorization: `Bearer ${await token(ALICE)}` },
+    });
+    expect(now.json().data[0].garments).toHaveLength(1);
+    expect(now.json().data[0].garments[0].worn_count).toBe(4);
+  });
+
+  dbIt('reports cost per wear only for pieces actually worn', async () => {
+    const ids = await stockedCloset(15);
+    const userId = await userIdOf(ALICE);
+
+    for (const day of [1, 2, 3, 4]) {
+      await pool!.query(
+        `insert into wear_events (user_id, garment_id, worn_on)
+         values ($1, $2, current_date - ($3 || ' days')::interval)`,
+        [userId, ids[0], String(day)],
+      );
+    }
+
+    const stats = await app!.inject({
+      method: 'GET',
+      url: '/v1/wardrobe/stats',
+      headers: { authorization: `Bearer ${await token(ALICE)}` },
+    });
+
+    const body = stats.json();
+    expect(body.closet_value.total).toBe(600);
+    expect(body.closet_value.priced_pieces).toBe(15);
+    // £40 over 4 wears, and only that piece counts — including unworn pieces
+    // would make the wardrobe look more expensive the more of it was
+    // catalogued.
+    expect(body.cost_per_wear.average).toBe(10);
+    expect(body.cost_per_wear.based_on_pieces).toBe(1);
+  });
+
+  dbIt('groups wear history by day for the calendar', async () => {
+    const ids = await stockedCloset(15);
+    const userId = await userIdOf(ALICE);
+
+    await pool!.query(
+      `insert into wear_events (user_id, garment_id, worn_on) values ($1, $2, current_date)`,
+      [userId, ids[0]],
+    );
+    await pool!.query(
+      `insert into wear_events (user_id, garment_id, worn_on) values ($1, $2, current_date)`,
+      [userId, ids[1]],
+    );
+
+    const response = await app!.inject({
+      method: 'GET',
+      url: '/v1/wardrobe/wear-history',
+      headers: { authorization: `Bearer ${await token(ALICE)}` },
+    });
+
+    const days = response.json().data;
+    expect(days).toHaveLength(1);
+    expect(days[0].garment_ids).toHaveLength(2);
+  });
+
+  dbIt("never reports another user's closet", async () => {
+    await stockedCloset(15);
+
+    const response = await app!.inject({
+      method: 'GET',
+      url: '/v1/wardrobe/stats',
+      headers: { authorization: `Bearer ${await token(MALLORY)}` },
+    });
+    expect(response.json().closet_value.priced_pieces).toBe(0);
+  });
+});

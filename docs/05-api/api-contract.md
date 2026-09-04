@@ -257,12 +257,23 @@ DELETE /try-on/:id                    hard delete
 ## Wardrobe insights
 
 ```text
-GET    /wardrobe/insights             ?kinds[]=forgotten,never_worn,tags_attached,...
+GET    /wardrobe/insights             ?kinds=forgotten,never_worn,tags_attached,most_loved
 GET    /wardrobe/stats                closet value, cost per wear aggregates
+GET    /wardrobe/wear-history         ?from=&to=  → wears grouped by day
 ```
 
 Insights return hydrated garments so the client can render imagery without a
 second round trip.
+
+Each insight carries a `total` alongside its `garments`: the headline counts
+everything that qualifies while the rail shows a preview of it ("17 pieces
+deserve another chance", three on screen). `most_loved` is a single hero rather
+than a rail, so its `total` is 1.
+
+An insight the closet cannot support is **omitted**, not returned empty — a
+section reading "0 pieces deserve another chance" is a dashboard cell, and this
+screen is fashion content (`screen-specs.md` §26). A new or small closet
+therefore returns few insights or none, which is correct.
 
 ---
 

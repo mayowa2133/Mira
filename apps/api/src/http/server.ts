@@ -24,6 +24,9 @@ import { ImportsService, type JobEnqueuer } from '../modules/imports/service.js'
 import { registerOutfitRoutes } from '../modules/outfits/routes.js';
 import { OutfitRepository } from '../modules/outfits/repository.js';
 import { OutfitService } from '../modules/outfits/service.js';
+import { registerWardrobeRoutes } from '../modules/wardrobe/routes.js';
+import { WardrobeRepository } from '../modules/wardrobe/repository.js';
+import { WardrobeService } from '../modules/wardrobe/service.js';
 import { ClosetService } from '../modules/closet/service.js';
 import { GarmentRepository } from '../modules/closet/repository.js';
 import { IdentityRepository } from '../modules/identity/repository.js';
@@ -214,6 +217,10 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
 
       await registerOutfitRoutes(instance, {
         service: new OutfitService(new OutfitRepository(pool), garments, storage),
+      });
+
+      await registerWardrobeRoutes(instance, {
+        service: new WardrobeService(new WardrobeRepository(pool), garments, storage),
       });
 
       const importsRepository = new ImportsRepository(pool);
