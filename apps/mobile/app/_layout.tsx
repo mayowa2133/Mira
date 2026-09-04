@@ -76,6 +76,7 @@ export default function RootLayout() {
             <Stack.Screen name="review/[id]" options={{ presentation: 'modal' }} />
             <Stack.Screen name="look/[id]" />
             <Stack.Screen name="insights" />
+            <Stack.Screen name="wear-history" />
             <Stack.Screen name="profile/privacy" />
             <Stack.Screen name="profile/style" />
             <Stack.Screen name="outfit/new" options={{ presentation: 'modal' }} />

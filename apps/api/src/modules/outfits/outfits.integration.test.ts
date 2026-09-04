@@ -677,7 +677,10 @@ describe('wardrobe insights (Phase 9)', () => {
 
     const days = response.json().data;
     expect(days).toHaveLength(1);
-    expect(days[0].garment_ids).toHaveLength(2);
+    // Hydrated, not ids: §27 asks for thumbnails per day, and a calendar that
+    // arrives without its pictures is a table of dates (task 9.5).
+    expect(days[0].garments).toHaveLength(2);
+    expect(days[0].garments[0]).toHaveProperty('image_url');
   });
 
   dbIt("never reports another user's closet", async () => {

@@ -80,3 +80,21 @@ export function useSimilarOwned() {
     select: (response) => response.data,
   });
 }
+
+/** A day's wears (§27). Hydrated, so the calendar can show thumbnails. */
+export type WearHistoryDay = {
+  worn_on: string;
+  garments: InsightGarment[];
+  outfit_ids: string[];
+};
+
+export function useWearHistory(range: { from: string; to: string }) {
+  return useQuery({
+    queryKey: ['wardrobe', 'wear-history', range.from, range.to],
+    queryFn: () =>
+      request<{ data: WearHistoryDay[] }>(
+        `/wardrobe/wear-history?from=${range.from}&to=${range.to}`,
+      ),
+    select: (response) => response.data,
+  });
+}

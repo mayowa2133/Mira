@@ -89,6 +89,18 @@ export default function InsightsScreen() {
           content about two garments, not a statistic. */}
       <SimilarOwnedSection pairs={similar.data ?? []} onPressGarment={openGarment} />
 
+      {/* §27 lives one tap from here: the question "when did I last wear this"
+          is the same question the rest of this screen is answering. */}
+      <Pressable
+        style={styles.historyLink}
+        onPress={() => router.push('/wear-history')}
+        accessibilityRole="button"
+        testID="open-wear-history"
+      >
+        <Text style={styles.historyLabel}>What you wore</Text>
+        <Text style={styles.historyChevron}>›</Text>
+      </Pressable>
+
       {/* Optional, collapsed by default (§26). */}
       {stats.data ? (
         <View style={styles.numbers}>
@@ -249,6 +261,16 @@ const styles = StyleSheet.create({
     fontSize: type.body.fontSize,
     color: color.textSecondary,
   },
+
+  historyLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: space.screenX,
+    minHeight: space.tapMin,
+  },
+  historyLabel: { fontSize: type.body.fontSize, color: color.text },
+  historyChevron: { fontSize: type.body.fontSize, color: color.textTertiary },
 
   numbers: {
     marginTop: space.lg,

@@ -251,32 +251,54 @@ export class WardrobeService {
     };
   }
 
+  /**
+   * What was worn, by day (§27, task 9.5).
+   *
+   * Returns hydrated garments rather than ids, for the same reason insights do:
+   * §27 asks for "garment thumbnails per day", and a calendar that arrives
+   * without its pictures is a table of dates for however long the images take.
+   *
+   * The signing is per garment, not per wear — a piece worn on ten days is
+   * signed once.
+   */
   async wearHistory(scope: UserScope, range: { from: string; to: string }) {
     const events = await this.repo.wearHistory(scope, range);
 
-    // Grouped by day, which is how the calendar reads it.
     const byDay = new Map<string, { garment_ids: string[]; outfit_ids: string[] }>();
     for (const event of events) {
       const day = byDay.get(event.worn_on) ?? { garment_ids: [], outfit_ids: [] };
-      if (event.garment_id) day.garment_ids.push(event.garment_id);
+      if (event.garment_id && !day.garment_ids.includes(event.garment_id)) {
+        day.garment_ids.push(event.garment_id);
+      }
       if (event.outfit_id && !day.outfit_ids.includes(event.outfit_id)) {
         day.outfit_ids.push(event.outfit_id);
       }
       byDay.set(event.worn_on, day);
     }
 
-    return [...byDay.entries()].map(([worn_on, value]) => ({ worn_on, ...value }));
+    const ids = [...new Set([...byDay.values()].flatMap((d) => d.garment_ids))];
+    const [garments, urls] = await Promise.all([
+      this.repo.insightGarments(scope, ids),
+      this.imageUrls(scope, ids),
+    ]);
+    const byId = new Map(garments.map((row) => [row.id, this.serialize(row, urls)]));
+
+    return (
+      [...byDay.entries()]
+        .map(([worn_on, value]) => ({
+          worn_on,
+          outfit_ids: value.outfit_ids,
+          garments: value.garment_ids
+            .map((id) => byId.get(id))
+            .filter((g): g is InsightGarment => Boolean(g)),
+        }))
+        // Newest first: a calendar is read from now backwards.
+        .sort((a, b) => (a.worn_on < b.worn_on ? 1 : -1))
+    );
   }
 }
 
-/**
- * A garment row, in the shape the scorer compares.
- *
- * The hashes must come along. `nearIdenticalPairs` only NOMINATES a pair; the
- * score is computed by comparing the two subjects, so a subject with no hashes
- * cannot fire `image_hash` — and a pair found by nothing but its photograph
- * would have been nominated, scored at zero, and dropped.
- */
+/** A garment row, in the shape the duplicate scorer compares. */
 function toSubject(row: SubjectRow, hashes: Map<string, string[]>): DuplicateSubject {
   return {
     id: row.id,
@@ -294,6 +316,10 @@ function toSubject(row: SubjectRow, hashes: Map<string, string[]>): DuplicateSub
     purchaseDate: row.purchase_date ? row.purchase_date.toISOString().slice(0, 10) : null,
     sourceType: row.source_type,
     sourceReference: row.source_reference,
+    // The hashes must come along: `nearIdenticalPairs` only NOMINATES a pair,
+    // and a subject with no hashes cannot fire `image_hash` — so a pair found
+    // by nothing but its photograph would be nominated, scored at zero and
+    // dropped.
     imageHashes: hashes.get(row.id) ?? [],
   };
 }
@@ -301,10 +327,9 @@ function toSubject(row: SubjectRow, hashes: Map<string, string[]>): DuplicateSub
 /**
  * Garments photographed near-identically.
  *
- * A hash near-match is not an equality, so it cannot be a bucket key — these
- * pairs are found by comparing hashes directly and handed to `findPairs`
- * alongside the ones it groups itself. Quadratic in images rather than in
- * garments, which for a wardrobe is a far smaller number.
+ * A hash near-match is not an equality, so it cannot be a bucket key. Quadratic
+ * in images rather than in garments, which for a wardrobe is a far smaller
+ * number.
  */
 function nearIdenticalPairs(hashes: Map<string, string[]>): [string, string][] {
   const entries = [...hashes.entries()];
