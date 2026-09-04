@@ -73,19 +73,21 @@ final class AccessibilityTests: MiraUITestCase {
             let label = tiles.element(boundBy: index).label
             XCTAssertFalse(label.isEmpty, "a garment tile has no accessibility label")
 
-            // A garment with nothing known yet announces its state or, failing
-            // that, what it is. What it must NEVER do is fall back to its own
-            // child text: an empty label made iOS read the favourite heart, so
-            // a dress announced itself as "♡".
-            let isAnalyzing = label.contains("Still being analyzed")
-            let isDescribed = label.contains(",") || label.hasPrefix("A ") || label.hasPrefix("An ")
-            XCTAssertTrue(
-                isAnalyzing || isDescribed,
-                "tile label is neither a description nor a state: \(label)"
-            )
+            // Every tile leads with something that identifies the garment: a
+            // brand, a name, or what the thing is. Two earlier versions failed
+            // this differently — an empty label made iOS read the favourite
+            // heart ("♡"), and a colour-only label said "black", which tells a
+            // listener the colour of something they cannot identify.
             XCTAssertFalse(
                 label == "♡" || label == "♥",
                 "a tile is announcing its heart glyph — its label is empty"
+            )
+
+            let leading = label.split(separator: ",").first.map(String.init) ?? label
+            let isColourOnly = !leading.contains(" ") && leading.lowercased() == leading
+            XCTAssertFalse(
+                isColourOnly,
+                "tile leads with a bare attribute rather than an identity: \(label)"
             )
         }
     }

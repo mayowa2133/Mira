@@ -9,6 +9,7 @@ import {
 import { Image } from 'expo-image';
 import { color, layout, radius, space, type } from '@mira/ui';
 import { imageSrc, type Garment } from './queries';
+import { garmentLabel } from './garment-label';
 
 /**
  * Garment tile (`docs/02-design/design-system.md` §6, Reference 01).
@@ -21,40 +22,6 @@ import { imageSrc, type Garment } from './queries';
  * At most three text lines. Purchase date, SKU, wear count and source belong on
  * the detail screen, never on the tile.
  */
-/**
- * What to call a garment with nothing known about it yet.
- *
- * Its category, in language — "A pair of shoes" rather than `shoes`. Vague, but
- * true, and it is what a person would say when pointing at something across a
- * room.
- */
-function describeUnnamed(category: string): string {
-  switch (category) {
-    case 'shoes':
-      return 'A pair of shoes';
-    case 'bags':
-      return 'A bag';
-    case 'accessories':
-      return 'An accessory';
-    case 'dresses':
-      return 'A dress';
-    case 'tops':
-      return 'A top';
-    case 'bottoms':
-      return 'A pair of bottoms';
-    case 'outerwear':
-      return 'A layer';
-    case 'sets':
-      return 'A set';
-    case 'activewear':
-      return 'Activewear';
-    case 'swimwear':
-      return 'Swimwear';
-    default:
-      return 'A piece in your closet';
-  }
-}
-
 function formatSubtitle(garment: Garment): string {
   return [garment.primary_color, garment.size.normalized ?? garment.size.raw]
     .filter(Boolean)
@@ -82,24 +49,17 @@ function GarmentTileComponent({ garment, onPress, onToggleFavorite }: GarmentTil
   const isAnalyzing = garment.analysis_state === 'analyzing';
   const tileImage = imageSrc(garment.canonical_image, 'thumb');
 
-  // A single accessible label per tile: a screen reader should hear the
-  // garment, not four disconnected fragments (docs/02-design/accessibility.md §4).
-  //
-  // It must never be EMPTY. iOS falls back to concatenating a view's children
-  // when its label is blank, and the only text inside a tile with no attributes
-  // yet is the favourite heart — so a garment Mira knows nothing about
-  // announced itself as "♡". The category is a poor description and a far
-  // better one than that.
-  const label =
-    [
-      brand,
-      garment.name,
-      subtitle,
-      garment.favorite ? 'Favourited' : null,
-      isAnalyzing ? 'Still being analyzed' : null,
-    ]
-      .filter(Boolean)
-      .join(', ') || describeUnnamed(garment.category);
+  // One phrase describing the garment (accessibility.md §4). The rules live in
+  // garment-label.ts because they have been wrong three times, each in a way
+  // only a device showed.
+  const label = garmentLabel({
+    brand,
+    name: garment.name,
+    subtitle,
+    category: garment.category,
+    favorite: garment.favorite,
+    isAnalyzing,
+  });
 
   // The tile is one accessibility element, which means iOS folds the favourite
   // button inside it into the tile and a screen reader can never reach it. The
