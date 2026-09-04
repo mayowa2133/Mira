@@ -457,3 +457,44 @@ Format:
   contain, and §2 names it: visual embedding similarity, which arrives with
   Phase 5. The exit criterion should be read as **blocked on Phase 5**, not as
   an open bug in the scorer.
+
+## D-030 — The provider owns tokens; Mira owns the user
+
+- **Date:** 2026-09-04 · **Status:** Accepted
+- **Decision:** `POST /auth/session` verifies a provider identity and returns
+  the Mira user and closet — no access token, no refresh token. `/auth/refresh`
+  and `DELETE /auth/session` delegate to the managed provider behind an
+  `IdentityProvider` seam. Mira never issues or rotates a session token.
+- **Why:** `auth-contract.md` reads two ways. "Mira issues its own session on
+  top of the provider's identity" suggests minting; "signature and expiry
+  validated against **the provider's** JWKS" on every request describes the
+  opposite, and is what the code has always done. Task 0.5 settles it by naming
+  the goal: *managed* auth. A rotating refresh-token family with single-use
+  detection and family invalidation is precisely the machinery a managed
+  provider exists to supply, and precisely where a hand-rolled version goes
+  wrong. Building a second copy of state the provider already keeps could only
+  ever end with the two disagreeing.
+- **Consequences:** the endpoints exist and are tested, but the two that need a
+  live provider return **503** locally rather than succeeding, because
+  `SUPABASE_URL` is unset. That is deliberate: a stub returning success for
+  `revokeSessions` would make sign-out look tested while revoking nothing, and
+  a user who signed out on a shared device would still be signed in. Wiring
+  Supabase is a configuration change plus one implementation of the seam, with
+  no caller affected.
+
+## D-031 — Account deletion is recorded outside the queue
+
+- **Date:** 2026-09-04 · **Status:** Accepted
+- **Decision:** a deletion request is written to its own `account_deletions`
+  table with no foreign key to `users`, rather than to `ingestion_jobs`.
+- **Why:** `ingestion_jobs.user_id` is `on delete cascade`, so the job that
+  deletes a user would delete itself partway through its own teardown. And
+  `data-retention.md` requires that a deletion reaching its final attempt
+  **alerts**, and that failures are "tracked until resolved" — tracking cannot
+  live in a row that vanishes with the thing it tracks.
+- **Consequences:** the table is deliberately not row-level-secured and not
+  scoped at the repository layer, because it must stay readable after its user
+  is gone, which is exactly when SEC-5 has nothing left to scope to. Safety
+  comes from the endpoint instead: the subject is taken from the verified actor
+  and never from the request, and a mutation test holds that. The retained
+  email is constrained to be cleared on completion, so "hard delete" stays true.

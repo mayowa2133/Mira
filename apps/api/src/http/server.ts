@@ -16,6 +16,7 @@ import { bearerToken, type UserResolver } from './auth.js';
 import type { TokenVerifier } from '../modules/identity/verify.js';
 import { registerHealthRoutes } from '../modules/health/routes.js';
 import { registerIdentityRoutes } from '../modules/identity/routes.js';
+import { createUnconfiguredProvider, type IdentityProvider } from '../modules/identity/provider.js';
 import { registerClosetRoutes } from '../modules/closet/routes.js';
 import { DuplicateRepository } from '../modules/closet/duplicate-repository.js';
 import { DuplicateService } from '../modules/closet/duplicate-service.js';
@@ -54,6 +55,14 @@ export type BuildServerOptions = {
   storage?: StorageDriver;
   /** Injected for tests; defaults to resolving against the users table. */
   userResolver?: UserResolver;
+  /**
+   * The managed identity provider (`auth-contract.md`).
+   *
+   * Defaults to one that refuses every operation, which is the honest local
+   * behaviour: nothing here can revoke a session at a provider that is not
+   * configured, and a no-op would make sign-out look like it worked.
+   */
+  identityProvider?: IdentityProvider;
   /**
    * Where background work is handed off.
    *
@@ -197,7 +206,12 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
   await app.register(
     async (instance) => {
       await registerHealthRoutes(instance, options);
-      await registerIdentityRoutes(instance);
+      // Supabase drops in here when SUPABASE_URL is configured; until then the
+      // operations that genuinely need a provider fail loudly rather than
+      // pretending to have revoked something (auth-contract.md).
+      await registerIdentityRoutes(instance, {
+        provider: options.identityProvider ?? createUnconfiguredProvider(),
+      });
 
       const storage =
         options.storage ??

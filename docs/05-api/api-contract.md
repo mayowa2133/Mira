@@ -36,6 +36,17 @@ DELETE /auth/account          account deletion (see data-retention.md)
 
 Details: [auth-contract.md](auth-contract.md).
 
+Mira does **not** mint tokens. `POST /auth/session` exchanges a verified
+provider identity for the Mira user record and their closet — it is an
+idempotent bootstrap, not a token endpoint, and returns no token of any kind.
+Issuing, rotating and revoking are the managed provider's, which is what
+"managed authentication" means and why `/auth/refresh` and `DELETE
+/auth/session` delegate rather than reimplement (D-030).
+
+`DELETE /auth/account` returns **202**: sessions are revoked synchronously, the
+request is recorded, and the ordered teardown in
+[data-retention.md](../07-security/data-retention.md) runs as a job.
+
 ---
 
 ## Closet and garments
