@@ -281,6 +281,37 @@ verified; the presentation is not built.
 0.5's exit criterion — "sign in on a device, land on an empty Home" — cannot be
 claimed while the first half of that sentence is impossible.
 
+## Where the AI-free work stands
+
+**45 of 59 AI-free tasks (76%).** 46.5 of the whole 89-task plan (52%).
+
+Landed this session: 4.6, 4.7, 4.8 (duplicates), 9.2, 9.5, 5.1, 5.6, 11.1,
+§28, the auth endpoints, the onboarding screens, and the account deletion
+worker.
+
+### Still open, and honestly why
+
+| Task | Why it is not done |
+| ---- | ------------------ |
+| 0.5 | Endpoints and screens exist; **nobody can sign in** without a configured provider |
+| 0.8 | Env config supports four environments; none are deployed |
+| 8.1 | Email OAuth needs Google credentials |
+| 4.1, 4.3, 4.5 | Capture screens with nothing reading what they capture |
+| 8.3, 8.5–8.8 | Purchase review with no candidates to review |
+| 10.1, 10.2, 10.7 | A biometric gate protects nothing until 10.2 creates body images, and a deletion path needs rows to delete |
+| 11.2 | Two of its four signals (swaps, regenerations) are Phase 7; the other two are already recorded in `outfits.favorite` and `wear_events`. A `feedback_events` table now would be a third copy with nothing reading it |
+
+The pattern in the bottom four rows is the same: they are **buildable and
+inert**. Building them produces surfaces that look finished and do nothing,
+which is what `CLAUDE.md` means by not letting implementation convenience turn
+the product into an inventory interface.
+
+### Exit criteria that are open on work marked done
+
+- **1.x** — the 60 fps claim rests on a duration metric, not a frame rate.
+- **4.8** — duplicate recall is 0.88 against a 0.90 target (D-029).
+- **0.5** — "sign in on a device" is impossible today.
+
 ## Known flakes
 
 ### ~~Worker suite — one unexplained failure in ~10 runs~~ — EXPLAINED 2026-09-04
