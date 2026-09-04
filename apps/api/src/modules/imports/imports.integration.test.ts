@@ -409,3 +409,118 @@ describe('GET /imports/:id', () => {
     expect(response.statusCode).toBe(404);
   });
 });
+
+describe('corrections (3.6)', () => {
+  /** A garment with an AI-sourced brand, as analysis would leave it. */
+  async function analyzedGarment(): Promise<string> {
+    const key = await uploadedPhoto(ALICE);
+    const created = await app!.inject({
+      method: 'POST',
+      url: '/v1/imports/photo',
+      headers: await auth(ALICE),
+      payload: { upload_key: key },
+    });
+    const garmentId = created.json().garment_id as string;
+    const userId = await userIdOf(ALICE);
+
+    await pool!.query(
+      `insert into garment_attributes
+         (garment_id, user_id, field, value, confidence, source, provider, model)
+       values ($1, $2, 'brand', $3::jsonb, 0.62, 'ai', 'test', 'test-model')`,
+      [garmentId, userId, JSON.stringify('Ganni')],
+    );
+    await pool!.query(`update garments set brand_raw = 'Ganni' where id = $1`, [garmentId]);
+    return garmentId;
+  }
+
+  dbIt('records a correction as a user value that wins', async () => {
+    const garmentId = await analyzedGarment();
+
+    await app!.inject({
+      method: 'PATCH',
+      url: `/v1/garments/${garmentId}`,
+      headers: await auth(ALICE),
+      payload: { brand_raw: 'Toteme' },
+    });
+
+    const response = await app!.inject({
+      method: 'GET',
+      url: `/v1/garments/${garmentId}/attributes`,
+      headers: { authorization: `Bearer ${await token(ALICE)}` },
+    });
+
+    const brand = response.json().data.find((a: { field: string }) => a.field === 'brand');
+    expect(brand.value).toBe('Toteme');
+    expect(brand.source).toBe('user');
+    // The user is not guessing about their own wardrobe.
+    expect(brand.band).toBe('high');
+  });
+
+  dbIt('keeps what the model said beside the correction', async () => {
+    const garmentId = await analyzedGarment();
+
+    await app!.inject({
+      method: 'PATCH',
+      url: `/v1/garments/${garmentId}`,
+      headers: await auth(ALICE),
+      payload: { brand_raw: 'Toteme' },
+    });
+
+    const response = await app!.inject({
+      method: 'GET',
+      url: `/v1/garments/${garmentId}/attributes`,
+      headers: { authorization: `Bearer ${await token(ALICE)}` },
+    });
+
+    const brand = response.json().data.find((a: { field: string }) => a.field === 'brand');
+    // A correction that erased the AI value would destroy the evaluation
+    // signal that makes corrections valuable (AI-5).
+    expect(brand.superseded).toMatchObject({ value: 'Ganni', source: 'ai' });
+  });
+
+  dbIt('reports bands, never raw numbers (D-011)', async () => {
+    const garmentId = await analyzedGarment();
+
+    const response = await app!.inject({
+      method: 'GET',
+      url: `/v1/garments/${garmentId}/attributes`,
+      headers: { authorization: `Bearer ${await token(ALICE)}` },
+    });
+
+    const body = JSON.stringify(response.json());
+    expect(body).not.toContain('0.62');
+    const brand = response.json().data.find((a: { field: string }) => a.field === 'brand');
+    expect(brand.band).toBe('medium');
+  });
+
+  dbIt('does not record an edit to a field the model never produces', async () => {
+    const garmentId = await analyzedGarment();
+
+    await app!.inject({
+      method: 'PATCH',
+      url: `/v1/garments/${garmentId}`,
+      headers: await auth(ALICE),
+      payload: { notes: 'bought in Copenhagen' },
+    });
+
+    const response = await app!.inject({
+      method: 'GET',
+      url: `/v1/garments/${garmentId}/attributes`,
+      headers: { authorization: `Bearer ${await token(ALICE)}` },
+    });
+
+    // Recording notes as a "correction" would dilute the regression alarm.
+    expect(response.json().data.some((a: { field: string }) => a.field === 'notes')).toBe(false);
+  });
+
+  dbIt("404s on another user's attributes", async () => {
+    const garmentId = await analyzedGarment();
+
+    const response = await app!.inject({
+      method: 'GET',
+      url: `/v1/garments/${garmentId}/attributes`,
+      headers: { authorization: `Bearer ${await token(MALLORY)}` },
+    });
+    expect(response.statusCode).toBe(404);
+  });
+});

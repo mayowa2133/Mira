@@ -109,6 +109,37 @@ export type CreateGarmentInput = {
 
 export type UpdateGarmentInput = Partial<Omit<CreateGarmentInput, 'closetId' | 'sourceType'>>;
 
+export type GarmentAttributeRow = {
+  field: string;
+  value: unknown;
+  confidence: string;
+  source: string;
+  provider: string | null;
+  model: string | null;
+  created_at: string;
+};
+
+/**
+ * Fields a correction is recorded for.
+ *
+ * Maps the API's edit shape onto the field names `garment_attributes` uses, so
+ * a user value and the AI value it supersedes are comparable rows rather than
+ * two vocabularies.
+ */
+export const CORRECTABLE_FIELDS: Record<string, keyof UpdateGarmentInput> = {
+  category: 'category',
+  subcategory: 'subcategory',
+  brand: 'brandRaw',
+  pattern: 'pattern',
+  fit: 'fit',
+  materials: 'materials',
+  season: 'season',
+  occasion: 'occasion',
+  style: 'styleTags',
+  size: 'sizeRaw',
+};
+
+
 export type ListParams = {
   filters: GarmentFilters;
   sort: SortKey;
@@ -471,6 +502,53 @@ export class GarmentRepository {
       `update garments set brand_id = $3 where user_id = $1 and id = $2`,
       [scope.userId, garmentId, brandId],
     );
+  }
+
+  /**
+   * Everything known about a garment's fields, newest first.
+   *
+   * Both AI and user rows: the review screen needs to show what Mira thought
+   * AND what the user said, and a correction that hid the model's answer would
+   * destroy the evaluation signal that makes corrections valuable (AI-5).
+   */
+  async attributesFor(scope: UserScope, garmentId: string): Promise<GarmentAttributeRow[]> {
+    const { rows } = await scopedQuery<GarmentAttributeRow>(
+      this.db,
+      scope,
+      `select field, value, confidence::text as confidence, source, provider, model,
+              created_at::text as created_at
+         from garment_attributes
+        where user_id = $1 and garment_id = $2
+        order by created_at desc`,
+      [scope.userId, garmentId],
+    );
+    return rows;
+  }
+
+  /**
+   * Record a user's correction.
+   *
+   * Appended, never an update: `garment_attributes` keeps the AI value beside
+   * the corrected one so nothing is lost (AI-5), and a rising correction rate
+   * on a field is the model-regression alarm the product depends on.
+   *
+   * Confidence is 1: the user is not guessing about their own wardrobe.
+   */
+  async recordCorrections(
+    scope: UserScope,
+    garmentId: string,
+    corrections: { field: string; value: unknown }[],
+  ): Promise<void> {
+    for (const correction of corrections) {
+      await scopedQuery(
+        this.db,
+        scope,
+        `insert into garment_attributes
+           (garment_id, user_id, field, value, confidence, source)
+         values ($2, $1, $3, $4::jsonb, 1.0, 'user')`,
+        [scope.userId, garmentId, correction.field, JSON.stringify(correction.value)],
+      );
+    }
   }
 }
 

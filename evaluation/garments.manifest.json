@@ -1,0 +1,19 @@
+{
+  "dataset": "garments",
+  "version": "0.0.1-example",
+  "note": "Shape only. Not the 200-photograph dataset; no accuracy claim can be made from these.",
+  "cases": [
+    {
+      "id": "example-0001",
+      "image": "garments/example-0001.jpg",
+      "hasTag": false,
+      "expected": { "category": "dresses", "colors": ["black"], "brand": null }
+    },
+    {
+      "id": "example-0002",
+      "image": "garments/example-0002.jpg",
+      "hasTag": true,
+      "expected": { "category": "tops", "colors": ["white"], "brand": "Ganni" }
+    }
+  ]
+}

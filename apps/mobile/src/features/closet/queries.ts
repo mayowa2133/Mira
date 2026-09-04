@@ -340,3 +340,29 @@ export function useUpdateGarment(id: string) {
     },
   });
 }
+
+/**
+ * What Mira knows about each field, and how sure it is.
+ *
+ * Bands, never numbers (D-011). The screen renders a tick, a statement, a
+ * question or an empty row — a user should never see "0.72", which invites
+ * arguing with a number instead of correcting a value.
+ */
+export type ConfidenceBand = 'high' | 'medium' | 'low' | 'very_low';
+
+export type GarmentAttribute = {
+  field: string;
+  value: unknown;
+  band: ConfidenceBand;
+  source: string;
+  superseded: { value: unknown; band: ConfidenceBand; source: string } | null;
+};
+
+export function useGarmentAttributes(id: string) {
+  return useQuery({
+    queryKey: ['garment', id, 'attributes'],
+    queryFn: () => request<{ data: GarmentAttribute[] }>(`/garments/${id}/attributes`),
+    select: (response) => response.data,
+    enabled: Boolean(id),
+  });
+}

@@ -90,6 +90,57 @@ through the photo library. Real-device capture remains a manual check.
 `takePictureAsync` is unexercised; the tests reach the same code path through
 the photo library. Real-device capture remains a manual check.
 
+## Phase 3 status
+
+| # | Task | Status |
+| - | ---- | ------ |
+| 3.1 | packages/ai capability interfaces + provider config | **Done** — interfaces and stub; no real provider configured |
+| 3.2 | Validation → taxonomy clamp → confidence normalization | **Done** (D-021) |
+| 3.3 | garment.analyze worker | **Done** — verified on real captures |
+| 3.4 | garment_attributes with per-field provenance and confidence | **Done** (D-022) |
+| 3.5 | AI Item Review screen | **Done** — not yet seen on a simulator |
+| 3.6 | Correction flow; user values win permanently | **Done** |
+| 3.7 | Product matching (barcode, SKU, URL) + cache | **Not started** |
+| 3.8 | Evaluation harness + 200-garment dataset baseline | **Harness done; dataset absent** |
+
+### Exit criteria — none can be claimed yet
+
+- [ ] **Category accuracy ≥ 0.95, brand precision without a tag ≥ 0.95**
+- [ ] **Calibration error ≤ 0.10**
+
+  Both need a real vision provider AND the 200-photograph dataset. Neither
+  exists: the pipeline runs against a stub that returns a fixed answer, so any
+  number it produced would describe the stub. `npm run evaluate` deliberately
+  exits non-zero with "NOT RUN — this is not a pass" rather than reporting a
+  metric it could not measure.
+
+- [x] **A malformed provider response degrades to category-only, with no data
+      loss** — a response that cannot be parsed is retried once and then falls
+      back to category-only; one out-of-taxonomy value is dropped and the rest
+      of the response survives (D-021).
+- [x] **No form of empty fields is ever shown (CAP-2)** — the review screen
+      renders a tick, a statement, a question or an empty row per field
+      according to its band, and the rules are unit-tested.
+
+### What is blocking the rest
+
+**No vision provider.** 3.1's interfaces and config are in place and the stub
+exercises the whole path, but nothing is wired to a real model. That needs a
+provider choice, a key, and a cost decision — and until it exists the accuracy
+bars cannot be approached, let alone claimed.
+
+**No evaluation dataset.** 200 garment photographs, consented. Q-14 in
+`open-questions.md` — how consent for evaluation use is captured — is still
+open and should be settled before images are collected, not after.
+
+**3.7 product matching** needs a real catalogue or retailer integration to
+match against. The routing seam (barcode, SKU, product URL) is where it
+attaches; nothing about it is built.
+
+**No segmentation provider**, so cutouts never happen and every garment keeps
+its original as canonical. The quality gate and the fallback are implemented
+and tested; only the provider is missing.
+
 ## Known flakes
 
 ### Worker suite — one unexplained failure in ~10 runs

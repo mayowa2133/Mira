@@ -67,6 +67,9 @@ export default function RootLayout() {
               options={{ presentation: 'fullScreenModal', animation: 'fade' }}
             />
             <Stack.Screen name="edit/[id]" options={{ presentation: 'modal' }} />
+            {/* AI Item Review (screen-specs.md §12). Presented, not pushed:
+                it is a moment in the capture flow, not a place in the closet. */}
+            <Stack.Screen name="review/[id]" options={{ presentation: 'modal' }} />
           </Stack>
         </SnackbarProvider>
       </SafeAreaProvider>

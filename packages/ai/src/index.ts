@@ -13,3 +13,4 @@ export * from './pipeline.js';
 export { stubProviders } from './stub-provider.js';
 export * from './clamp.js';
 export * from './understand.js';
+export * from './evaluation.js';

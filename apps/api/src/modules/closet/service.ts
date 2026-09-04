@@ -7,6 +7,7 @@
  */
 import {
   CONFIDENCE,
+  confidenceBand,
   isCategory,
   isGarmentStatus,
   isSubcategoryOf,
@@ -167,6 +168,34 @@ function serializeGarmentSync(
   };
 }
 
+/**
+ * Turn an edit into the corrections it represents.
+ *
+ * Only fields the model also produces are recorded: a correction is meaningful
+ * as a comparison against what Mira said, and recording `notes` as a
+ * "correction" would dilute the signal the alarm depends on.
+ */
+function correctionsFrom(input: UpdateGarmentInput): { field: string; value: unknown }[] {
+  const out: { field: string; value: unknown }[] = [];
+
+  const record = (field: string, value: unknown) => {
+    if (value !== undefined) out.push({ field, value });
+  };
+
+  record('category', input.category);
+  record('subcategory', input.subcategory);
+  record('brand', input.brandRaw);
+  record('pattern', input.pattern);
+  record('fit', input.fit);
+  record('materials', input.materials);
+  record('season', input.season);
+  record('occasion', input.occasion);
+  record('style', input.styleTags);
+  record('size', input.sizeRaw);
+
+  return out;
+}
+
 export class ClosetService {
   constructor(
     private readonly repo: GarmentRepository,
@@ -325,12 +354,65 @@ export class ClosetService {
     const row = await this.repo.update(scope, id, input);
     if (!row) throw notFound(ErrorCode.garmentNotFound);
 
+    // A correction is the most valuable signal the product collects
+    // (ai-product-spec.md §4): it is recorded as a user-sourced value that wins
+    // permanently, beside the AI value rather than on top of it.
+    const corrections = correctionsFrom(input);
+    if (corrections.length > 0) await this.repo.recordCorrections(scope, id, corrections);
+
     if (input.brandRaw) {
       const brand = await this.repo.resolveBrand(input.brandRaw);
       if (brand) await this.repo.attachBrand(scope, id, brand.id);
     }
 
     return this.get(scope, id);
+  }
+
+  /**
+   * What is known about each field, as bands rather than numbers.
+   *
+   * D-011: bands, not raw numbers, reach the UI. A user should never see
+   * "0.72" — it invites arguing with a number instead of correcting a value.
+   */
+  async attributes(scope: UserScope, id: string) {
+    const garment = await this.repo.findById(scope, id);
+    if (!garment) throw notFound(ErrorCode.garmentNotFound);
+
+    const rows = await this.repo.attributesFor(scope, id);
+
+    // Newest first, so the first row for a field is the value in force. A user
+    // correction therefore shadows the AI value without deleting it.
+    const seen = new Set<string>();
+    const current: {
+      field: string;
+      value: unknown;
+      band: string;
+      source: string;
+      superseded: { value: unknown; band: string; source: string } | null;
+    }[] = [];
+
+    for (const row of rows) {
+      if (seen.has(row.field)) continue;
+      seen.add(row.field);
+
+      const older = rows.find((other) => other.field === row.field && other !== row);
+
+      current.push({
+        field: row.field,
+        value: row.value,
+        band: confidenceBand(Number(row.confidence)),
+        source: row.source,
+        superseded: older
+          ? {
+              value: older.value,
+              band: confidenceBand(Number(older.confidence)),
+              source: older.source,
+            }
+          : null,
+      });
+    }
+
+    return current;
   }
 
   async setFavorite(scope: UserScope, id: string, favorite: boolean) {

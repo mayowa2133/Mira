@@ -158,6 +158,18 @@ export async function registerClosetRoutes(
     return { count: await service.count(requireScope(request), params.filters) };
   });
 
+  /**
+   * What Mira knows about each field, and how sure it is.
+   *
+   * Powers the AI Item Review screen (`screen-specs.md` §12), which renders a
+   * tick, a statement, a question or an empty row depending on the band —
+   * never the number itself (D-011).
+   */
+  app.get('/garments/:id/attributes', { onRequest: requireAuth }, async (request) => {
+    const { id } = request.params as { id: string };
+    return { data: await service.attributes(requireScope(request), id) };
+  });
+
   app.post('/garments', { onRequest: requireAuth }, async (request, reply) => {
     // Idempotency-Key is required on every creating POST, so a retried request
     // cannot create a duplicate (docs/05-api/api-contract.md — Conventions).
