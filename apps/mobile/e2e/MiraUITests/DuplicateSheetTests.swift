@@ -19,12 +19,24 @@ final class DuplicateSheetTests: MiraUITestCase {
         fillForm(name: "Contour Bodysuit")
         submit()
 
+        // Either band's wording. Which one depends on the score, and this test
+        // is about being ASKED — the first version demanded the confident
+        // phrasing ("...already in your closet") and failed against the soft
+        // one ("Is this one you already own?"), which is the correct wording
+        // for a very similar name plus the same colour and size (§7).
         let headline = app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS[c] 'already' AND label CONTAINS[c] 'closet'")
+            NSPredicate(format: "label CONTAINS[c] 'already'")
         ).firstMatch
         XCTAssertTrue(
             headline.waitForExistence(timeout: 30),
             "adding the same piece twice did not ask\n\n\(hierarchy())"
+        )
+
+        // And it says WHY, in words rather than a score.
+        XCTAssertTrue(
+            app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'Same brand'"))
+                .firstMatch.exists,
+            "the sheet did not say what it noticed"
         )
 
         // §4 offers three answers, and no more.
@@ -74,7 +86,16 @@ final class DuplicateSheetTests: MiraUITestCase {
 
     // MARK: - Helpers
 
-    /// Add one garment and return to the closet.
+    /// Add one garment, then get back to somewhere the tab bar exists.
+    ///
+    /// A successful save lands on garment detail, which is a stack route
+    /// OUTSIDE `(tabs)` and therefore has no tab bar — so the next
+    /// `openManualAdd()` waits for a Closet tab that is not on screen.
+    ///
+    /// Relaunching is the way back, and it is worth more than a Back tap: the
+    /// second add then runs against a process that has never seen the first
+    /// garment in memory, so a duplicate it finds can only have come from the
+    /// server.
     @discardableResult
     private func addPiece(name: String) -> Bool {
         guard openManualAdd() else { return false }
@@ -86,6 +107,8 @@ final class DuplicateSheetTests: MiraUITestCase {
             XCTFail("the first piece of its kind was treated as a duplicate")
             return false
         }
+
+        app.launch()
         return true
     }
 
@@ -129,33 +152,114 @@ final class DuplicateSheetTests: MiraUITestCase {
     }
 
     /// Fill the fields the moderate and strong signals are computed from.
+    ///
+    /// Chips BEFORE text. The category and colour chips sit above the text
+    /// fields, and once the keyboard is up they scroll out of reach — a tap
+    /// then lands on nothing, the form stays invalid, and `GarmentForm` makes
+    /// an invalid submit a silent no-op. The screen simply does not move, which
+    /// looks exactly like a slow launch from the outside.
     private func fillForm(name: String, brand: String? = nil) {
-        type(into: "Brand", brand ?? self.brand)
-        type(into: "Name", name)
-        type(into: "Size", "S")
-
-        // Category is required; colour and category are what make the pair
-        // score at all (duplicate-detection.md §2).
-        app.buttons["Tops"].firstMatch.tap()
-        app.buttons["Black"].firstMatch.tap()
+        select("Tops")
+        select("Black")
+        enter("Brand", brand ?? self.brand)
+        enter("Name", name)
+        enter("Size", "S")
     }
 
-    private func type(into label: String, _ text: String) {
+    /// Tap a chip, and prove it took.
+    ///
+    /// A chip that did not register is invisible as a failure: the form stays
+    /// invalid and the submit button does nothing at all. The chip relabels
+    /// itself ", selected" when active, so the state is observable.
+    private func select(_ label: String) {
+        let chip = app.buttons[label]
+        guard chip.waitForExistence(timeout: 15) else {
+            XCTFail("no \"\(label)\" chip on the form\n\n\(hierarchy())")
+            return
+        }
+        chip.tap()
+
+        XCTAssertTrue(
+            app.buttons["\(label), selected"].waitForExistence(timeout: 5),
+            "tapping \"\(label)\" did not select it — the form will silently refuse to submit"
+        )
+    }
+
+    /// Type into a labelled field, and prove the field got what was typed.
+    ///
+    /// NOT called `type(into:_:)`. That shadows Swift's own `type(of:)`, and
+    /// when this helper briefly went missing the compiler resolved the calls to
+    /// the builtin and failed only the TEST target — `test-without-building`
+    /// then happily ran the previous bundle, reporting results for code that no
+    /// longer existed.
+    ///
+    /// The read-back is not belt and braces. React Native's TextInput is
+    /// controlled: every keystroke round-trips through JavaScript and comes back
+    /// as a new `value`, and synthetic typing outruns that. It dropped
+    /// characters here for real — "Testbrand31320" arrived as "Tand31320",
+    /// which is a different brand, so the app correctly declined to see a
+    /// duplicate and the test blamed the product for its own typo.
+    private func enter(_ label: String, _ text: String) {
         let field = app.textFields[label]
         guard field.waitForExistence(timeout: 10) else {
             XCTFail("no \"\(label)\" field\n\n\(hierarchy())")
             return
         }
-        field.tap()
-        field.typeText(text)
+
+        for attempt in 1...3 {
+            field.tap()
+
+            // Clear whatever a previous attempt left behind. An empty
+            // TextInput reports its placeholder as its value, so that is not
+            // "existing text".
+            let current = field.value as? String
+            if let current, !current.isEmpty, current != field.placeholderValue {
+                field.press(forDuration: 1.0)
+                let selectAll = app.menuItems["Select All"]
+                if selectAll.waitForExistence(timeout: 2) { selectAll.tap() }
+                field.typeText(XCUIKeyboardKey.delete.rawValue)
+            }
+
+            field.typeText(text)
+            if (field.value as? String) == text { return }
+
+            if attempt == 3 {
+                XCTFail(
+                    "\"\(label)\" holds \(String(describing: field.value)) after typing \"\(text)\""
+                )
+            }
+        }
     }
 
+    /// Submit, and prove the form actually left.
+    ///
+    /// An invalid form makes this button inert, so "nothing happened" has to be
+    /// a failure here rather than a timeout somewhere later that reads as a
+    /// slow launch.
     private func submit() {
+        // Dismiss the keyboard so the CTA is not under it.
+        if app.keyboards.count > 0 {
+            app.typeText("\n")
+        }
+
         let button = app.buttons["Add to my closet"]
-        if !button.exists {
-            // The button sits below the fold once the keyboard is up.
-            app.swipeUp()
+        if !button.exists { app.swipeUp() }
+        guard button.waitForExistence(timeout: 10) else {
+            XCTFail("no submit button\n\n\(hierarchy())")
+            return
         }
         button.tap()
+
+        // Either the sheet asks, or the form is gone. Both are "it submitted".
+        let asked = app.buttons["duplicate-same_item"]
+        let left = app.staticTexts["Add a piece"]
+        let deadline = Date().addingTimeInterval(20)
+        while Date() < deadline {
+            if asked.exists || !left.exists { return }
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        XCTFail(
+            "the form did not submit — it is still on screen and nothing was asked\n\n\(hierarchy())"
+        )
     }
 }

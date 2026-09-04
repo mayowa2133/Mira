@@ -50,6 +50,14 @@ export function DuplicateSheet({
   const existingImage =
     existing.canonical_image?.thumb_url ?? existing.canonical_image?.url ?? null;
 
+  // §4 shows both pieces as images "because that is how the user will actually
+  // decide". When NEITHER has one — two manually added garments, which is the
+  // case this sheet sees most — that becomes two large grey rectangles saying
+  // nothing, and it pushes the names and the answers off the screen. Same
+  // mistake as the saved-looks collage. So imagery appears when there is any to
+  // show, and the names lead when there is not.
+  const hasImagery = existingImage !== null || incoming.imageUri !== null;
+
   return (
     <Modal
       visible={visible}
@@ -69,8 +77,14 @@ export function DuplicateSheet({
               caption="In your closet"
               label={describeGarment(existing)}
               imageUri={existingImage}
+              showImage={hasImagery}
             />
-            <Piece caption="Adding now" label={incoming.label} imageUri={incoming.imageUri} />
+            <Piece
+              caption="Adding now"
+              label={incoming.label}
+              imageUri={incoming.imageUri}
+              showImage={hasImagery}
+            />
           </View>
 
           <View style={styles.choices}>
@@ -110,25 +124,31 @@ function Piece({
   caption,
   label,
   imageUri,
+  showImage,
 }: {
   caption: string;
   label: string;
   imageUri: string | null;
+  showImage: boolean;
 }) {
   return (
     <View style={styles.piece} accessible accessibilityLabel={`${caption}: ${label}`}>
-      {imageUri ? (
-        <Image
-          style={styles.pieceImage}
-          source={{ uri: imageUri }}
-          contentFit="cover"
-          transition={140}
-          accessible={false}
-        />
-      ) : (
-        <View style={styles.pieceImage} />
-      )}
-      <Text style={styles.pieceCaption}>{caption}</Text>
+      {showImage ? (
+        imageUri ? (
+          <Image
+            style={styles.pieceImage}
+            source={{ uri: imageUri }}
+            contentFit="cover"
+            transition={140}
+            accessible={false}
+          />
+        ) : (
+          // One piece photographed and the other not is worth seeing: the gap
+          // is information, not an empty slot.
+          <View style={styles.pieceImage} />
+        )
+      ) : null}
+      <Text style={[styles.pieceCaption, !showImage && styles.pieceCaptionBare]}>{caption}</Text>
       <Text style={styles.pieceLabel} numberOfLines={3}>
         {label}
       </Text>
@@ -156,6 +176,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: color.surfaceSunken,
   },
+  pieceCaptionBare: { marginTop: 0 },
   pieceCaption: {
     marginTop: space.sm,
     fontSize: type.caption.fontSize,

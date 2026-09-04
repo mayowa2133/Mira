@@ -15,6 +15,7 @@ import {
 } from '@tanstack/react-query';
 import type { DuplicateCandidate } from './duplicate-sheet';
 import { request, toQuery } from '@/lib/api';
+import { idempotencyKey } from '@/lib/ids';
 
 /**
  * Matches `GarmentImage` in `docs/05-api/openapi.yaml`.
@@ -319,7 +320,7 @@ export function useCreateGarment() {
       request<Garment>('/garments', {
         method: 'POST',
         body: payload,
-        idempotencyKey: globalThis.crypto.randomUUID(),
+        idempotencyKey: idempotencyKey(),
       }),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ['garments'] });
