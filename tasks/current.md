@@ -293,7 +293,7 @@ worker.
 
 | Task | Why it is not done |
 | ---- | ------------------ |
-| 0.5 | Endpoints and screens exist; **nobody can sign in** without a configured provider |
+| 0.5 | Endpoints and screens exist; **nobody can sign in** until a Supabase project is created (D-032) |
 | 0.8 | Env config supports four environments; none are deployed |
 | 8.1 | Email OAuth needs Google credentials |
 | 4.1, 4.3, 4.5 | Capture screens with nothing reading what they capture |

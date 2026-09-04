@@ -502,9 +502,18 @@ Format:
 ## D-032 — Postgres stays; Clerk is a reasonable auth swap
 
 - **Date:** 2026-09-04 · **Status:** Accepted
-- **Decision:** Mira keeps PostgreSQL. Convex is **not** adopted as the
-  database. Clerk may replace Supabase Auth when task 0.5's client half is
-  built, adopted for developer experience rather than for cost.
+- **Decision:** Mira keeps PostgreSQL, and uses **Supabase Auth** — not Clerk.
+  Convex is not adopted as the database. One provider, one bill.
+
+  **Resolved 2026-09-04, reversing an earlier draft of this entry that led with
+  Clerk.** The deciding number is auth at scale: Supabase Pro includes 100,000
+  MAU and charges $0.00325 beyond it; Clerk includes 50,000 MRU and charges
+  $0.02 beyond it. At 100k users that is **$0 against $1,025/month**; at 500k,
+  $1,325 against roughly $8,125. Clerk buys about a day of Expo wiring —
+  `@clerk/clerk-expo` wraps the Apple and Google flows that Supabase Auth needs
+  assembled from `expo-apple-authentication` and `signInWithIdToken`. A day is
+  not worth that line item, and `IdentityProvider` (D-030) means the choice is
+  reversible if it ever becomes one.
 - **Why:** the question was raised as a cost decision — "Supabase gets
   expensive, Convex is cheaper" — and cost is the one thing neither choice
   moves. Mira's spend is images (an original plus two derivatives per garment,
@@ -558,6 +567,22 @@ Format:
   been made — stronger than the per-app cost argument this entry was originally
   written to answer. It does not change the finding below, because it is an
   argument about a portfolio and the findings are about this codebase.
+
+  **Two implementation notes, since "use Supabase" is ambiguous here.**
+
+  Mira uses Supabase as *hosted Postgres plus an identity provider*, and
+  nothing else. It does not use PostgREST, the auto-generated client API, or
+  Supabase's migration tooling: `DATABASE_URL` points at the Supabase instance
+  and Mira's own checksum-verified runner owns the schema. Adopting Supabase's
+  tooling as well would give the schema two owners.
+
+  Consequently Mira's RLS policies stay as they are — they key off
+  `current_setting('mira.user_id')`, set per transaction by `scopedQuery`,
+  rather than Supabase's conventional `auth.uid()`. `auth.uid()` is meaningful
+  only when the client talks to Postgres directly with the user's own JWT, and
+  Mira's clients never do; they talk to Fastify, which holds a service
+  connection. Anyone reading Supabase's RLS documentation later should know
+  that divergence is deliberate.
 
   If cost is the real concern, the lever is object storage: originals plus
   derivatives with egress. Cloudflare R2's zero egress is the change that shows
