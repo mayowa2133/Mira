@@ -9,6 +9,7 @@ import { createLocalStorage, isSafeStorageKey } from '@mira/storage';
 import { stubProviders } from '@mira/ai';
 import { JOB_TYPES } from './jobs.js';
 import { runImageProcessLoop } from './image/runner.js';
+import { runAnalyzeLoop } from './analyze/runner.js';
 import type { ImageProcessPorts } from './image/process.js';
 import { derivedKey } from './image/keys.js';
 
@@ -69,11 +70,19 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => shutdown('SIGINT'));
 
   logger.info('worker started', {
-    registered_job_types: 1,
+    registered_job_types: 2,
     known_job_types: JOB_TYPES.length,
   });
 
-  await runImageProcessLoop({ pool, ports, logger }, { signal: controller.signal });
+  // Both loops run in one process and poll independently, so a slow vision
+  // provider cannot stall image processing behind it.
+  await Promise.all([
+    runImageProcessLoop({ pool, ports, logger }, { signal: controller.signal }),
+    runAnalyzeLoop(
+      { pool, vision: stubProviders.vision, logger },
+      { signal: controller.signal },
+    ),
+  ]);
 }
 
 main().catch((error: unknown) => {

@@ -288,3 +288,24 @@ Format:
   dropped (it is `not null`); an unknown category becomes `other` and the drop
   is still recorded, so a model failing at categories cannot hide behind a
   plausible default.
+
+## D-022 — Only stateable values are flattened onto `garments`
+
+- **Date:** 2026-09-03 · **Status:** Accepted
+- **Decision:** `garment.analyze` writes every field it produced to
+  `garment_attributes` with its own confidence, but copies onto the `garments`
+  row only those at or above the medium band (≥ 0.60). Lower-confidence values
+  live in `garment_attributes` and reach the user only through the review
+  screen.
+- **Why:** the flattened columns are what the closet grid and detail screen
+  render, and they carry no confidence band — a value there is an assertion.
+  `ai-product-spec.md` §3 says medium and high are *stated* while low is *asked
+  as a question* and very low is not shown at all. Flattening a 0.41 material
+  would turn a question into a claim, and §6 is explicit that the user must
+  never see a confidently wrong value.
+- **Consequences:** a freshly analyzed garment can have fields that are known
+  but blank in the closet, which is correct — the review screen offers them as
+  questions and an answer promotes them. `ai_confidence` is the MINIMUM of the
+  stated fields rather than a mean, so one confident category cannot disguise a
+  weak brand. Nothing is lost either way: every value the model produced is in
+  `garment_attributes` for evaluation and for comparison against a later model.
