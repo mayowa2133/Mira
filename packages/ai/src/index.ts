@@ -11,3 +11,4 @@ export * from './capabilities.js';
 export * from './contracts.js';
 export * from './pipeline.js';
 export { stubProviders } from './stub-provider.js';
+export * from './clamp.js';

@@ -12,14 +12,14 @@ taxonomy-valid garment data.
 
 ```json
 {
-  "category": "dress",
+  "category": "dresses",
   "subcategory": "mini_dress",
   "brand": "Fashion Nova",
   "product_name": null,
   "colors": ["black"],
   "pattern": "solid",
   "materials": ["polyester"],
-  "style": ["going_out", "evening"],
+  "style": ["glam", "feminine"],
   "fit": "bodycon",
   "sleeve_length": "sleeveless",
   "neckline": "square",

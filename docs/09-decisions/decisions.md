@@ -268,3 +268,23 @@ Format:
   needs. Revisit when a job class arrives that needs sub-second dispatch or
   fan-out to many workers; the `JobEnqueuer` port in the API is the seam where a
   broker would attach.
+
+## D-021 — AI responses are clamped per field, never rejected wholesale
+
+- **Date:** 2026-09-03 · **Status:** Accepted
+- **Decision:** `clampUnderstanding` reduces a model response to taxonomy-valid
+  values field by field. An invalid value is dropped and recorded; the rest of
+  the response survives. `GarmentUnderstandingSchema`'s strict enums remain, but
+  they describe the shape a *validated* understanding has — they are not the
+  gate the raw response passes through.
+- **Why:** `garment-understanding.md` §1 requires that a non-taxonomy value be
+  dropped and logged as `ai_taxonomy_clamped`, and §7 requires the pipeline to
+  continue. Validating the whole object against strict enums does the opposite:
+  one unknown occasion would reject the response and cost the user a correct
+  category, colour and pattern. That is the data loss REL-4 forbids.
+- **Consequences:** every ingestion path clamps before persisting, and drops are
+  a quality signal worth alarming on — a rise means a prompt or model
+  regression, not a user problem. `category` is the one field that cannot be
+  dropped (it is `not null`); an unknown category becomes `other` and the drop
+  is still recorded, so a model failing at categories cannot hide behind a
+  plausible default.
