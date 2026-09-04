@@ -166,16 +166,23 @@ weak evidence.
 
 ## Known flakes
 
-### Worker suite — one unexplained failure in ~10 runs
+### ~~Worker suite — one unexplained failure in ~10 runs~~ — EXPLAINED 2026-09-04
 
-`promotes an accepted cutout to canonical` failed once during a full `verify`
-with "1 row, expected 2", and has passed 10 consecutive runs since, including
-six back to back. The symptom means `recordResult` threw and rolled back, but
-the runner's error was discarded by a silent test logger.
+The self-explaining logger paid for itself: on the next occurrence the failure
+named its cause, `unsupported_image_undecodable` on a photograph that was
+definitely decodable.
 
-Not claimed as fixed. The logger now records what the runner reported and
-assertions include it, so a recurrence will explain itself instead of costing
-another investigation.
+Job claiming is global by design, and the tests shared a database with
+development. A test seeds a capture and a locally running worker claims it
+first, reads the key against the API's storage root instead of the test's temp
+directory, finds nothing, and fails the job permanently. The test then sees one
+image row where it expected two.
+
+Rare because the window is one poll interval, which is why it survived ten
+runs. Fixed by giving integration tests their own database
+(`npm run db:test:setup`, `mira_test`) rather than by making the race less
+likely. Verified: the full suite passes three times with a worker live on the
+development database, and no test user is created there any more.
 
 ## Blocked
 

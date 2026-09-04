@@ -13,7 +13,19 @@ import type { RawModelResponse, VisionCapability } from '@mira/ai';
 import { analyzeOneGarment, MAX_ATTEMPTS } from './runner.js';
 import { enqueueAnalysis, STATEABLE } from './repository.js';
 
-const DATABASE_URL = process.env['DATABASE_URL'] ?? 'postgresql://mira:mira@localhost:5433/mira';
+/**
+ * A database of its own, never the development one.
+ *
+ * These tests write real rows and, in the worker's case, CLAIM QUEUED JOBS —
+ * and job claiming is global by design. Run against the dev database with a
+ * worker up, a test and the real worker race for the same job: whoever loses
+ * sees it fail against the wrong storage root, which is exactly the
+ * intermittent `unsupported_image_undecodable` that went unexplained twice.
+ *
+ *   npm run db:test:setup
+ */
+const DATABASE_URL =
+  process.env['TEST_DATABASE_URL'] ?? 'postgresql://mira:mira@localhost:5433/mira_test';
 
 let pool: pg.Pool | null = null;
 let available = false;

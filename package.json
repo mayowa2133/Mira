@@ -31,7 +31,9 @@
     "db:migrate": "npm run db:migrate --workspace @mira/api --",
     "db:seed": "npm run db:seed --workspace @mira/api --",
     "clean": "npm run clean --workspaces --if-present && rm -rf node_modules",
-    "evaluate": "node scripts/evaluate.mjs"
+    "evaluate": "node scripts/evaluate.mjs",
+    "db:test:setup": "node scripts/setup-test-db.mjs",
+    "pretest": "npm run db:test:setup"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

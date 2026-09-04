@@ -143,6 +143,10 @@ const FLATTENED: Record<string, string> = {
   category: 'category',
   subcategory: 'subcategory',
   brand: 'brand_raw',
+  // The FIRST colour is the primary one (garment-understanding.md §1: "Ordered,
+  // first is primary"). Its absence here meant analysis threw away a colour it
+  // was 0.92 confident about, and left tiles with nothing to say about
+  // themselves.
   pattern: 'pattern',
   fit: 'fit',
   sleeve_length: 'sleeve_length',
@@ -244,14 +248,12 @@ async function flattenConfidentValues(
   const values: unknown[] = [job.userId, job.garmentId];
 
   for (const attribute of result.attributes) {
-    const column = FLATTENED[attribute.field];
-    if (!column) continue;
     if (attribute.confidence < STATEABLE) continue;
 
-    // `category` is special: photo import already set it to `other`, which is a
-    // placeholder rather than a user's answer, so analysis may replace it.
-    values.push(columnValue(attribute.field, attribute.value));
-    assignments.push(`${column} = $${values.length}`);
+    for (const { field, column } of columnsFor(attribute.field)) {
+      values.push(columnValue(field, attribute.value));
+      assignments.push(`${column} = $${values.length}`);
+    }
   }
 
   if (assignments.length === 0) return;
@@ -267,10 +269,35 @@ async function flattenConfidentValues(
   );
 }
 
-/** Arrays stay arrays; a single colour becomes the primary. */
+/**
+ * Which columns an attribute fills.
+ *
+ * Usually one. The colour list fills two, because `garments` stores a primary
+ * colour and the rest separately — the model returns them ordered, first is
+ * primary (garment-understanding.md §1).
+ */
+function columnsFor(field: string): { field: string; column: string }[] {
+  if (field === 'colors') {
+    return [
+      { field: 'colors', column: 'primary_color' },
+      { field: 'secondary_colors', column: 'secondary_colors' },
+    ];
+  }
+
+  const column = FLATTENED[field];
+  return column ? [{ field, column }] : [];
+}
+
+/** Arrays stay arrays; the colour list becomes a primary plus the rest. */
 function columnValue(field: string, value: unknown): unknown {
   if (field === 'materials' || field === 'style' || field === 'season' || field === 'occasion') {
     return Array.isArray(value) ? value : [];
+  }
+  if (field === 'colors') {
+    return Array.isArray(value) ? (value[0] ?? null) : null;
+  }
+  if (field === 'secondary_colors') {
+    return Array.isArray(value) ? value.slice(1) : [];
   }
   return value;
 }

@@ -73,14 +73,19 @@ final class AccessibilityTests: MiraUITestCase {
             let label = tiles.element(boundBy: index).label
             XCTAssertFalse(label.isEmpty, "a garment tile has no accessibility label")
 
-            // A garment straight off the camera has no brand, name or colour
-            // yet — that is what analysis is for — so it announces its state
-            // instead. Requiring a comma there would demand Mira invent
-            // attributes it does not know.
+            // A garment with nothing known yet announces its state or, failing
+            // that, what it is. What it must NEVER do is fall back to its own
+            // child text: an empty label made iOS read the favourite heart, so
+            // a dress announced itself as "♡".
             let isAnalyzing = label.contains("Still being analyzed")
+            let isDescribed = label.contains(",") || label.hasPrefix("A ") || label.hasPrefix("An ")
             XCTAssertTrue(
-                isAnalyzing || label.contains(","),
-                "tile label is neither a whole description nor a state: \(label)"
+                isAnalyzing || isDescribed,
+                "tile label is neither a description nor a state: \(label)"
+            )
+            XCTAssertFalse(
+                label == "♡" || label == "♥",
+                "a tile is announcing its heart glyph — its label is empty"
             )
         }
     }
