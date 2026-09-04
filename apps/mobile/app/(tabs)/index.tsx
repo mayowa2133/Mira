@@ -9,7 +9,7 @@ import { GarmentRail } from '@/features/wardrobe/GarmentRail';
 import { useInsights } from '@/features/wardrobe/queries';
 import { imageSrc, useClosetSummary, useGarments } from '@/features/closet/queries';
 import { useOutfits } from '@/features/outfits/queries';
-import { ApiError } from '@/lib/api';
+import { describeLoadFailure } from '@/features/closet/load-failure';
 
 /**
  * Home (`docs/02-design/screen-specs.md` §13).
@@ -58,9 +58,14 @@ export default function HomeScreen() {
     [recent.data],
   );
 
-  const total = summary.data?.total ?? 0;
-  const isEmpty = !summary.isPending && total === 0;
-  const isSmall = !summary.isPending && total > 0 && total < ENOUGH_TO_NOTICE;
+  // An unloaded closet is not an empty one. Reading `?? 0` here meant a failed
+  // request rendered as "Let's find what you already own" — an invitation to
+  // re-add clothes the user already has — and it made an expired session
+  // indistinguishable from a new account for as long as it lasted.
+  const failure = describeLoadFailure(summary.error);
+  const total = summary.data?.total;
+  const isEmpty = total === 0;
+  const isSmall = total !== undefined && total > 0 && total < ENOUGH_TO_NOTICE;
 
   const today = new Date().toLocaleDateString(undefined, {
     weekday: 'long',
@@ -92,6 +97,17 @@ export default function HomeScreen() {
 
       {summary.isPending ? (
         <ClosetGridSkeleton count={4} />
+      ) : failure ? (
+        <ClosetState
+          message={failure.message}
+          hint={failure.hint}
+          actionLabel={failure.actionLabel}
+          onAction={() => {
+            void summary.refetch();
+            void recent.refetch();
+            void insights.refetch();
+          }}
+        />
       ) : isEmpty ? (
         <ClosetState
           message="Let's find what you already own."
@@ -183,17 +199,20 @@ export default function HomeScreen() {
             </View>
           ) : null}
 
-          {recent.error && recentGarments.length === 0 ? (
-            <ClosetState
-              message={
-                recent.error instanceof ApiError && recent.error.isOffline
-                  ? "You're offline."
-                  : "We couldn't load your closet."
-              }
-              actionLabel="Try again"
-              onAction={() => void recent.refetch()}
-            />
-          ) : null}
+          {/* The summary loaded but the garments did not — partial, which
+              `states-and-errors.md` says to show rather than hide. */}
+          {(() => {
+            const railFailure =
+              recentGarments.length === 0 ? describeLoadFailure(recent.error) : null;
+            return railFailure ? (
+              <ClosetState
+                message={railFailure.message}
+                hint={railFailure.hint}
+                actionLabel={railFailure.actionLabel}
+                onAction={() => void recent.refetch()}
+              />
+            ) : null;
+          })()}
         </>
       )}
     </ScrollView>
