@@ -10,7 +10,6 @@
  * Phase 3 (`docs/08-engineering/implementation-plan.md`).
  */
 import type {
-  GarmentUnderstanding,
   OutfitProposal,
   QueryInterpretation,
   TagReading,
@@ -60,8 +59,27 @@ export type OutfitRequest = {
   count: number;
 };
 
+/**
+ * Exactly what a model produced, before anyone has decided it is usable.
+ *
+ * Capabilities return raw text rather than a validated object on purpose. A
+ * provider that validated internally would have to reject a whole response over
+ * one out-of-taxonomy value — the data loss D-021 exists to prevent — and the
+ * caller could not tell a malformed answer from a merely imperfect one.
+ *
+ * `provider` and `model` travel with the text because `garment_attributes`
+ * records who said what (AI-1): a value without its author cannot be evaluated
+ * later, or rolled back when a model regresses.
+ */
+export type RawModelResponse = {
+  text: string;
+  provider: string;
+  model: string;
+  modelVersion?: string | undefined;
+};
+
 export interface VisionCapability {
-  analyzeGarment(input: GarmentAnalysisInput): Promise<Validated<GarmentUnderstanding>>;
+  analyzeGarment(input: GarmentAnalysisInput): Promise<RawModelResponse>;
   readTag(input: TagInput): Promise<Validated<TagReading>>;
 }
 

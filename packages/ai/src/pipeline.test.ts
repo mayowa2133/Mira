@@ -7,6 +7,7 @@ import {
   resolveCandidateIds,
   validate,
 } from './pipeline.js';
+import { clampUnderstanding } from './clamp.js';
 import { stubProviders } from './stub-provider.js';
 
 const validGarment = {
@@ -130,14 +131,28 @@ describe('candidate id resolution (AI-6) — hallucinated garments are a hard ga
 });
 
 describe('stub providers', () => {
-  it('produces output that passes its own contract', async () => {
-    const r = await stubProviders.vision.analyzeGarment({ images: [{ storageKey: 'k' }] });
-    expect(r.ok).toBe(true);
+  it('produces output that survives the clamp with nothing dropped', async () => {
+    const raw = await stubProviders.vision.analyzeGarment({ images: [{ storageKey: 'k' }] });
+    const { drops } = clampUnderstanding(JSON.parse(raw.text) as Record<string, unknown>);
+
+    expect(
+      drops,
+      `stub output is not taxonomy-valid: ${drops.map((d) => d.field).join(', ')}`,
+    ).toEqual([]);
+  });
+
+  it('reports which provider and model produced it (AI-1)', async () => {
+    // garment_attributes records the author of every value; a stub that
+    // omitted this would let the persistence path go untested.
+    const raw = await stubProviders.vision.analyzeGarment({ images: [{ storageKey: 'k' }] });
+    expect(raw.provider).toBeTruthy();
+    expect(raw.model).toBeTruthy();
   });
 
   it('never guesses a brand (D-014)', async () => {
-    const r = await stubProviders.vision.analyzeGarment({ images: [{ storageKey: 'k' }] });
-    if (r.ok) expect(r.value.brand).toBeNull();
+    const raw = await stubProviders.vision.analyzeGarment({ images: [{ storageKey: 'k' }] });
+    const { value } = clampUnderstanding(JSON.parse(raw.text) as Record<string, unknown>);
+    expect(value.brand).toBeNull();
   });
 
   it('only references ids from the supplied candidate set (AI-6)', async () => {

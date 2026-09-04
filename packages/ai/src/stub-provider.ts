@@ -18,7 +18,6 @@ import type {
   VisionCapability,
 } from './capabilities.js';
 import {
-  GarmentUnderstandingSchema,
   OutfitProposalsSchema,
   QueryInterpretationSchema,
   TagReadingSchema,
@@ -41,10 +40,16 @@ function fakeVector(seed: string): number[] {
 }
 
 const stubVision: VisionCapability = {
-  async analyzeGarment(): Promise<Validated<import('./contracts.js').GarmentUnderstanding>> {
-    return parseAndValidate(
-      GarmentUnderstandingSchema,
-      JSON.stringify({
+  /**
+   * A fixed, taxonomy-valid answer.
+   *
+   * Deliberately plausible rather than perfect: it exercises the real path —
+   * parse, clamp, persist, render — without a provider or a key, so everything
+   * downstream can be built and tested before one exists.
+   */
+  async analyzeGarment() {
+    return {
+      text: JSON.stringify({
         category: 'dresses',
         subcategory: 'midi_dress',
         brand: null,
@@ -59,13 +64,27 @@ const stubVision: VisionCapability = {
         neckline: 'square',
         length: 'midi',
         season: ['spring', 'summer'],
-        occasion: ['dinner', 'date'],
+        occasion: ['work', 'dinner'],
         size: null,
-        // Brand is null and carries no confidence: never guess a brand (D-014).
-        confidence: { category: 0.97, primary_color: 0.95, materials: 0.44 },
+        confidence: {
+          category: 0.94,
+          subcategory: 0.71,
+          colors: 0.92,
+          pattern: 0.88,
+          // Low, and correctly so: material from a photograph alone is a guess
+          // (garment-understanding.md §4).
+          materials: 0.41,
+          fit: 0.63,
+          season: 0.55,
+          occasion: 0.5,
+        },
       }),
-    );
+      provider: 'stub',
+      model: 'stub-vision',
+      modelVersion: '1',
+    };
   },
+
   async readTag(): Promise<Validated<import('./contracts.js').TagReading>> {
     return parseAndValidate(
       TagReadingSchema,
