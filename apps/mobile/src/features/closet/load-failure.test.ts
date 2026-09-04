@@ -79,3 +79,33 @@ describe('describing a failure to load', () => {
     );
   });
 });
+
+describe('per-screen wording', () => {
+  const serverError = new ApiError(500, 'internal', 'Something went wrong on our side.');
+
+  it('takes a subject as a bare string, for the common case', () => {
+    expect(describeLoadFailure(serverError, 'your looks')?.message).toBe(
+      "We couldn't load your looks.",
+    );
+  });
+
+  it('takes a whole headline for a screen that reads better in its own words', () => {
+    expect(
+      describeLoadFailure(serverError, { message: "We couldn't look through your closet." })
+        ?.message,
+    ).toBe("We couldn't look through your closet.");
+  });
+
+  it('does not let a screen reword offline or an ended session', () => {
+    // These say the same thing everywhere. Sharing them is the point; a screen
+    // inventing its own phrasing for "you are offline" is how the copy drifted
+    // into three places to begin with.
+    const custom = { message: 'Custom headline.' };
+    expect(describeLoadFailure(new ApiError(0, 'offline', ''), custom)?.message).toBe(
+      "You're offline.",
+    );
+    expect(describeLoadFailure(new ApiError(401, 'token_expired', ''), custom)?.message).toBe(
+      'Please sign in again.',
+    );
+  });
+});

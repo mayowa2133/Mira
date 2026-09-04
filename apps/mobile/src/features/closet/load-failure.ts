@@ -46,9 +46,25 @@ const SESSION_CODES = new Set([
 /** `ApiError` uses status 0 for "the request never left the device". */
 const OFFLINE = 0;
 
-export function describeLoadFailure(error: unknown, subject = 'your closet'): LoadFailure | null {
+export type LoadFailureCopy = {
+  /** Fills "We couldn't load ___." Ignored when `message` is given. */
+  subject?: string;
+  /**
+   * The whole headline, for a screen whose failure reads better in its own
+   * words — the insights screen could not "look through" the closet rather
+   * than load it. Only the generic branch: offline and an ended session say the
+   * same thing everywhere, which is the point of sharing them.
+   */
+  message?: string;
+};
+
+export function describeLoadFailure(
+  error: unknown,
+  copy: LoadFailureCopy | string = {},
+): LoadFailure | null {
   if (!error) return null;
 
+  const { subject = 'your closet', message } = typeof copy === 'string' ? { subject: copy } : copy;
   const api = asApiError(error);
 
   // Offline is not a failure, it is a condition. The wording says what happens
@@ -73,7 +89,7 @@ export function describeLoadFailure(error: unknown, subject = 'your closet'): Lo
   }
 
   return {
-    message: `We couldn't load ${subject}.`,
+    message: message ?? `We couldn't load ${subject}.`,
     // Never a raw provider error, stack trace or bare code as primary copy. The
     // API's own messages are written to be shown; anything else is not.
     hint: api?.message || 'Something went wrong on our side.',

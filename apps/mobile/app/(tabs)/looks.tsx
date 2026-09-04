@@ -6,7 +6,7 @@ import { color, radius, space, type } from '@mira/ui';
 import { ClosetGridSkeleton, ClosetState } from '@/features/closet/ClosetGrid';
 import { LookCard } from '@/features/outfits/LookCard';
 import { useOutfits, type Outfit, type OutfitTab } from '@/features/outfits/queries';
-import { ApiError } from '@/lib/api';
+import { describeLoadFailure } from '@/features/closet/load-failure';
 
 /**
  * Looks library (`docs/02-design/screen-specs.md` §22).
@@ -59,6 +59,10 @@ export default function LooksScreen() {
   const [tab, setTab] = useState<OutfitTab>('mine');
 
   const outfits = useOutfits(tab);
+
+  // Named for what failed, so "We couldn't load your looks" survives the move
+  // onto the shared helper.
+  const failure = describeLoadFailure(outfits.error, 'your looks');
   const open = useCallback((id: string) => router.push(`/look/${id}`), [router]);
 
   // Two columns, filled by whichever is currently shorter, so uneven cards do
@@ -137,14 +141,11 @@ export default function LooksScreen() {
       >
         {outfits.isPending ? (
           <ClosetGridSkeleton count={4} />
-        ) : outfits.error ? (
+        ) : failure ? (
           <ClosetState
-            message={
-              outfits.error instanceof ApiError && outfits.error.isOffline
-                ? "You're offline."
-                : "We couldn't load your looks."
-            }
-            actionLabel="Try again"
+            message={failure.message}
+            hint={failure.hint}
+            actionLabel={failure.actionLabel}
             onAction={() => void outfits.refetch()}
           />
         ) : (outfits.data ?? []).length === 0 ? (

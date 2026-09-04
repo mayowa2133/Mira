@@ -13,7 +13,7 @@ import {
   useWardrobeStats,
   type Insight,
 } from '@/features/wardrobe/queries';
-import { ApiError } from '@/lib/api';
+import { describeLoadFailure } from '@/features/closet/load-failure';
 
 /**
  * Wardrobe insights (`docs/02-design/screen-specs.md` §26).
@@ -35,6 +35,10 @@ export default function InsightsScreen() {
   const insights = useInsights();
   const stats = useWardrobeStats();
   const similar = useSimilarOwned();
+
+  const failure = describeLoadFailure(insights.error, {
+    message: "We couldn't look through your closet.",
+  });
 
   const openGarment = (id: string) => router.push(`/garment/${id}`);
 
@@ -59,14 +63,11 @@ export default function InsightsScreen() {
 
       {insights.isPending ? (
         <ClosetGridSkeleton count={4} />
-      ) : insights.error ? (
+      ) : failure ? (
         <ClosetState
-          message={
-            insights.error instanceof ApiError && insights.error.isOffline
-              ? "You're offline."
-              : "We couldn't look through your closet."
-          }
-          actionLabel="Try again"
+          message={failure.message}
+          hint={failure.hint}
+          actionLabel={failure.actionLabel}
           onAction={() => void insights.refetch()}
         />
       ) : (insights.data ?? []).length === 0 ? (
