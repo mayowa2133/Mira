@@ -25,7 +25,7 @@ export type CreateOutfitRequest = {
 
 function serializeOutfit(
   row: OutfitRow,
-  items: { garment_id: string; slot: string; position: number }[],
+  items: { garment_id: string; slot: string; position: number; image_url?: string | null }[],
 ) {
   return {
     id: row.id,
@@ -58,6 +58,37 @@ export class OutfitService {
       outfits.map((outfit) => outfit.id),
     );
 
+    // The Looks library is a masonry of collages, so a list WITHOUT imagery is
+    // a screen of blank cards. Images are fetched for every garment across
+    // every look in one query rather than per outfit — the alternative is an
+    // N+1 that grows with the user's wardrobe.
+    const garmentIds = [...new Set(items.map((item) => item.garment_id))];
+    const images = await this.garments.imagesFor(scope, garmentIds);
+
+    const imageByGarment = new Map<string, (typeof images)[number]>();
+    for (const image of images) {
+      if (image.is_canonical || !imageByGarment.has(image.garment_id)) {
+        imageByGarment.set(image.garment_id, image);
+      }
+    }
+
+    // Signed once per garment, not once per appearance: a piece can be in
+    // several looks.
+    const urlByGarment = new Map<string, string>();
+    await Promise.all(
+      garmentIds.map(async (garmentId) => {
+        const image = imageByGarment.get(garmentId);
+        if (!image) return;
+        // The thumb: a collage tile is small, and the original is an order of
+        // magnitude larger than it can use.
+        const signed = await this.storage.signedReadUrl(
+          image.thumb_key ?? image.storage_key,
+          scope.userId,
+        );
+        urlByGarment.set(garmentId, signed.url);
+      }),
+    );
+
     const byOutfit = new Map<string, typeof items>();
     for (const item of items) {
       const list = byOutfit.get(item.outfit_id) ?? [];
@@ -72,6 +103,7 @@ export class OutfitService {
           garment_id: item.garment_id,
           slot: item.slot,
           position: item.position,
+          image_url: urlByGarment.get(item.garment_id) ?? null,
         })),
       ),
     );

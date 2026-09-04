@@ -408,6 +408,63 @@ describe('GET /outfits', () => {
   });
 });
 
+describe('the Looks library needs imagery', () => {
+  dbIt('hydrates images in the LIST, not only on detail', async () => {
+    // The library is a masonry of collages; a list without imagery is a screen
+    // of blank cards, which is exactly what shipped before this test.
+    const top = await garment('tops');
+    const userId = await userIdOf(ALICE);
+    await pool!.query(
+      `insert into garment_images (garment_id, user_id, kind, storage_key, is_canonical, position)
+       values ($1, $2, 'original', $3, true, 0)`,
+      [top, userId, `garments/${userId}/${top}.jpg`],
+    );
+
+    await createLook([{ garment_id: top, slot: 'top' }]);
+
+    const response = await app!.inject({
+      method: 'GET',
+      url: '/v1/outfits?tab=mine',
+      headers: { authorization: `Bearer ${await token(ALICE)}` },
+    });
+
+    expect(response.json().data[0].items[0].image_url).toBeTruthy();
+  });
+
+  dbIt('counts a look as worn once, however many pieces it has', async () => {
+    // Wearing a look records an event per garment too, for provenance. Counting
+    // those as wears of the LOOK inflated it with every extra piece.
+    const top = await garment('tops');
+    const bottom = await garment('bottoms');
+    const look = (
+      await createLook([
+        { garment_id: top, slot: 'top' },
+        { garment_id: bottom, slot: 'bottom' },
+      ])
+    ).json();
+
+    await app!.inject({
+      method: 'POST',
+      url: '/v1/wear-events',
+      headers: await auth(ALICE),
+      payload: { outfit_id: look.id },
+    });
+
+    const { rows } = await pool!.query<{ worn_count: number }>(
+      'select worn_count from outfits where id = $1',
+      [look.id],
+    );
+    expect(rows[0]!.worn_count).toBe(1);
+
+    // The garments still count their own wear.
+    const garments = await pool!.query<{ worn_count: number }>(
+      'select worn_count from garments where id = any($1::uuid[])',
+      [[top, bottom]],
+    );
+    expect(garments.rows.map((r) => r.worn_count)).toEqual([1, 1]);
+  });
+});
+
 describe('GET /outfits/:id', () => {
   dbIt('hydrates each garment so look detail needs one request', async () => {
     const top = await garment('tops');

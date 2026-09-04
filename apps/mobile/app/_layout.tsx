@@ -70,6 +70,8 @@ export default function RootLayout() {
             {/* AI Item Review (screen-specs.md §12). Presented, not pushed:
                 it is a moment in the capture flow, not a place in the closet. */}
             <Stack.Screen name="review/[id]" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="look/[id]" />
+            <Stack.Screen name="outfit/new" options={{ presentation: 'modal' }} />
           </Stack>
         </SnackbarProvider>
       </SafeAreaProvider>

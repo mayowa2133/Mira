@@ -141,6 +141,29 @@ attaches; nothing about it is built.
 its original as canonical. The quality gate and the fallback are implemented
 and tested; only the provider is missing.
 
+## Phase 6 status
+
+| # | Task | Status |
+| - | ---- | ------ |
+| 6.1 | outfits, outfit_items + slot rules | **Done** |
+| 6.2 | Outfit builder with slot-filtered closet | **Done** — not yet exercised on device |
+| 6.3 | Looks library (masonry) with four tabs | **Done** — verified on simulator |
+| 6.4 | Look detail with tappable garments | **Done** — not yet exercised on device |
+| 6.5 | wear_events + derived worn_count / last_worn_at | **Done** — verified end to end |
+
+### Exit criteria
+
+- [x] **Dress/top+bottom exclusivity works and is overridable** — the builder
+      warns; the database does not refuse. A test saves a dress-over-top look
+      and expects 201, because taxonomy §14 says that is a real outfit.
+- [x] **Marking a look worn creates wear events for every garment** — verified
+      on real data: one look event plus one per piece, with the look counted
+      once and each garment counted once.
+
+Only the Looks library has been seen on a simulator. The builder and look detail
+typecheck and their API is tested, which this session has repeatedly shown is
+weak evidence.
+
 ## Known flakes
 
 ### Worker suite — one unexplained failure in ~10 runs
