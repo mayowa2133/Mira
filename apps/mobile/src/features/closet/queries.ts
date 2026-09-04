@@ -107,12 +107,33 @@ export type ClosetFilters = {
   color?: string[];
   season?: string[];
   occasion?: string[];
+  brand_id?: string[];
+  size?: string[];
   status?: string[];
   favorite?: boolean;
   never_worn?: boolean;
   tags_attached?: boolean;
+  price_min?: number;
+  price_max?: number;
+  added_within_days?: number;
   sort?: string;
 };
+
+/** What this closet can be filtered by (§16). */
+export type ClosetBrand = { id: string; name: string; count: number };
+export type ClosetFacets = {
+  brands: ClosetBrand[];
+  sizes: { size: string; count: number }[];
+};
+
+export function useClosetFacets() {
+  return useQuery({
+    queryKey: ['closet', 'facets'],
+    queryFn: () => request<ClosetFacets>('/closet/facets'),
+    // These change only when the closet does, and the sheet opens often.
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 export const closetKeys = {
   summary: ['closet', 'summary'] as const,

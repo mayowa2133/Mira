@@ -321,6 +321,21 @@ export class ClosetService {
     };
   }
 
+  /**
+   * What this closet can be filtered by (§16).
+   *
+   * Brands and sizes together in one call: the filter sheet needs both at the
+   * same moment, and two requests to populate one sheet is two chances for
+   * half of it to arrive.
+   */
+  async facets(scope: UserScope) {
+    const [brands, sizes] = await Promise.all([
+      this.repo.brandsInCloset(scope),
+      this.repo.sizesInCloset(scope),
+    ]);
+    return { brands, sizes };
+  }
+
   async get(scope: UserScope, id: string) {
     const row = await this.repo.findById(scope, id);
     // A garment that exists but belongs to another user is INVISIBLE, so this

@@ -114,6 +114,103 @@ final class FilterSheetTests: MiraUITestCase {
         ])
     }
 
+    /// §16's sections, which task 5.6 added: brand, size and price.
+    ///
+    /// Brands and sizes come from the closet rather than the taxonomy, so this
+    /// also proves the facets request reached the server — an empty list would
+    /// render no section at all and this would fail rather than pass quietly.
+    func testTheSheetOffersBrandSizeAndPrice() throws {
+        guard openFilterSheet() else { return }
+
+        // Matched case-insensitively: section headings are rendered uppercase
+        // by the field component, and asserting the exact string would be
+        // testing a stylesheet.
+        for section in ["Brand", "Size", "Price"] {
+            let heading = app.staticTexts.matching(
+                NSPredicate(format: "label ==[c] %@", section)
+            ).firstMatch
+            XCTAssertTrue(
+                heading.waitForExistence(timeout: 10),
+                "no \(section) section in the filter sheet\n\n\(hierarchy())"
+            )
+        }
+
+        XCTAssertTrue(
+            app.textFields["Search brands"].exists,
+            "the brand list is not searchable, which is what §16 asks for"
+        )
+        XCTAssertTrue(app.textFields["Minimum price"].exists)
+        XCTAssertTrue(app.textFields["Maximum price"].exists)
+    }
+
+    /// §16's status set, in full.
+    func testTheSheetOffersEveryStatus() throws {
+        guard openFilterSheet() else { return }
+
+        for status in ["Never worn", "Still has tags", "Recently added", "Favourite"] {
+            XCTAssertTrue(
+                app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", status))
+                    .firstMatch.exists,
+                "no \"\(status)\" status chip"
+            )
+        }
+    }
+
+    /// Brand chips are named, and picking one changes the count.
+    func testPickingABrandChangesTheCount() throws {
+        guard openFilterSheet() else { return }
+
+        let cta = showButton()
+        guard cta.waitForExistence(timeout: 15) else {
+            XCTFail("no CTA\n\n\(hierarchy())")
+            return
+        }
+        let before = cta.label
+
+        // The first brand chip sits under the search field; brands are labelled
+        // "<name>, N pieces" so they are distinguishable from category chips.
+        let brand = app.buttons.matching(
+            NSPredicate(format: "label MATCHES[c] '^[A-Za-z].*, [0-9]+ pieces$'")
+        ).firstMatch
+        guard brand.waitForExistence(timeout: 10) else {
+            XCTFail("no brand chip\n\n\(hierarchy())")
+            return
+        }
+        brand.tap()
+
+        // Filtering to one brand must show fewer pieces than the whole closet.
+        let deadline = Date().addingTimeInterval(15)
+        while Date() < deadline {
+            if showButton().label != before { return }
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        XCTFail("picking a brand did not change the count (still \(before))")
+    }
+
+    /// Open the closet and the filter sheet.
+    private func openFilterSheet() -> Bool {
+        guard openCloset() else { return false }
+
+        let filter = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH[c] 'Filter'")
+        ).firstMatch
+        guard filter.waitForExistence(timeout: 10) else {
+            XCTFail("Filter control missing")
+            return false
+        }
+        filter.tap()
+
+        // NOT `app.staticTexts["Filter"]`: the Filter control on the closet
+        // screen carries that label too, so it matches before the sheet is
+        // open and reports success for a sheet that never appeared. The sticky
+        // CTA exists only inside the sheet.
+        guard showButton().waitForExistence(timeout: 15) else {
+            XCTFail("the filter sheet did not open\n\n\(hierarchy())")
+            return false
+        }
+        return true
+    }
+
     private func showButton() -> XCUIElement {
         app.buttons.matching(
             NSPredicate(format: "label BEGINSWITH[c] 'Show' OR label BEGINSWITH[c] 'No pieces'")

@@ -15,20 +15,40 @@ export type FilterState = {
   color: string[];
   season: string[];
   occasion: string[];
+  /** Brand IDs, not names: an unresolved brand cannot be filtered on. */
+  brandId: string[];
+  size: string[];
+  /** Both optional and independent — "under £50" is a real thing to ask. */
+  priceMin: number | null;
+  priceMax: number | null;
   /** Status-shaped toggles, which map onto several different query params. */
   neverWorn: boolean;
   tagsAttached: boolean;
+  recentlyAdded: boolean;
   favorite: boolean;
   laundry: boolean;
 };
+
+/**
+ * What "Recently Added" means (§16).
+ *
+ * A window the server evaluates, not a date the client computes — a client
+ * clock a day out would silently include or exclude a piece on the boundary.
+ */
+export const RECENTLY_ADDED_DAYS = 30;
 
 export const EMPTY_FILTERS: FilterState = {
   category: [],
   color: [],
   season: [],
   occasion: [],
+  brandId: [],
+  size: [],
+  priceMin: null,
+  priceMax: null,
   neverWorn: false,
   tagsAttached: false,
+  recentlyAdded: false,
   favorite: false,
   laundry: false,
 };
@@ -42,8 +62,13 @@ export const isEmpty = (state: FilterState): boolean =>
   state.color.length === 0 &&
   state.season.length === 0 &&
   state.occasion.length === 0 &&
+  state.brandId.length === 0 &&
+  state.size.length === 0 &&
+  state.priceMin === null &&
+  state.priceMax === null &&
   !state.neverWorn &&
   !state.tagsAttached &&
+  !state.recentlyAdded &&
   !state.favorite &&
   !state.laundry;
 
@@ -53,8 +78,13 @@ export function countActive(state: FilterState): number {
     state.color.length +
     state.season.length +
     state.occasion.length +
+    state.brandId.length +
+    state.size.length +
+    // A range is one filter however many ends it has.
+    (state.priceMin !== null || state.priceMax !== null ? 1 : 0) +
     (state.neverWorn ? 1 : 0) +
     (state.tagsAttached ? 1 : 0) +
+    (state.recentlyAdded ? 1 : 0) +
     (state.favorite ? 1 : 0) +
     (state.laundry ? 1 : 0)
   );
@@ -74,6 +104,11 @@ export function toQueryFilters(state: FilterState): ClosetFilters {
   if (state.color.length) filters.color = state.color;
   if (state.season.length) filters.season = state.season;
   if (state.occasion.length) filters.occasion = state.occasion;
+  if (state.brandId.length) filters.brand_id = state.brandId;
+  if (state.size.length) filters.size = state.size;
+  if (state.priceMin !== null) filters.price_min = state.priceMin;
+  if (state.priceMax !== null) filters.price_max = state.priceMax;
+  if (state.recentlyAdded) filters.added_within_days = RECENTLY_ADDED_DAYS;
   if (state.neverWorn) filters.never_worn = true;
   if (state.tagsAttached) filters.tags_attached = true;
   if (state.favorite) filters.favorite = true;
@@ -100,7 +135,16 @@ const titleCase = (value: string): string =>
  * Applied filters stay visible while browsing, and each is removable in one tap
  * (`docs/02-design/screen-specs.md` §14, Reference 03).
  */
-export function appliedChips(state: FilterState): AppliedChip[] {
+export function appliedChips(
+  state: FilterState,
+  /**
+   * Brand ids are what the filter carries; names are what a chip must say.
+   * Passed in rather than looked up here so this stays free of the query layer
+   * — and a brand whose name has not loaded is skipped rather than shown as a
+   * uuid, which would be worse than showing nothing.
+   */
+  brandNames: Map<string, string> = new Map(),
+): AppliedChip[] {
   const chips: AppliedChip[] = [];
 
   const forList = (field: 'category' | 'color' | 'season' | 'occasion', values: string[]): void => {
@@ -117,6 +161,40 @@ export function appliedChips(state: FilterState): AppliedChip[] {
   forList('color', state.color);
   forList('season', state.season);
   forList('occasion', state.occasion);
+
+  for (const id of state.brandId) {
+    const name = brandNames.get(id);
+    if (!name) continue;
+    chips.push({
+      key: `brand:${id}`,
+      label: name,
+      remove: (s) => ({ ...s, brandId: s.brandId.filter((v) => v !== id) }),
+    });
+  }
+
+  for (const size of state.size) {
+    chips.push({
+      key: `size:${size}`,
+      label: `Size ${size}`,
+      remove: (s) => ({ ...s, size: s.size.filter((v) => v !== size) }),
+    });
+  }
+
+  if (state.priceMin !== null || state.priceMax !== null) {
+    chips.push({
+      key: 'price',
+      label: priceLabel(state.priceMin, state.priceMax),
+      remove: (s) => ({ ...s, priceMin: null, priceMax: null }),
+    });
+  }
+
+  if (state.recentlyAdded) {
+    chips.push({
+      key: 'recentlyAdded',
+      label: 'Recently added',
+      remove: (s) => ({ ...s, recentlyAdded: false }),
+    });
+  }
 
   if (state.neverWorn) {
     chips.push({
@@ -168,4 +246,16 @@ export function ctaLabel(count: number | undefined): string {
   if (count === undefined) return 'Show items';
   if (count === 0) return 'No pieces match';
   return `Show ${count} ${count === 1 ? 'piece' : 'pieces'}`;
+}
+
+/**
+ * A price range, said the way a person would.
+ *
+ * "Under 50" and "Over 50" rather than "0–50" and "50–∞": a range with one end
+ * open is a different thought from a range with two.
+ */
+export function priceLabel(min: number | null, max: number | null): string {
+  if (min !== null && max !== null) return `${min}–${max}`;
+  if (max !== null) return `Under ${max}`;
+  return `Over ${min}`;
 }

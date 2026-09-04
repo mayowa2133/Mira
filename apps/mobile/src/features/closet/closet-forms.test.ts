@@ -294,3 +294,71 @@ describe('filter CTA copy', () => {
     expect(ctaLabel(count as number | undefined)).toBe(expected);
   });
 });
+
+describe('the filters §16 adds (task 5.6)', () => {
+  const withFilters = (over: Partial<typeof EMPTY_FILTERS>) => ({ ...EMPTY_FILTERS, ...over });
+
+  it('sends brand ids, sizes and a price range', () => {
+    const query = toQueryFilters(
+      withFilters({ brandId: ['b1'], size: ['S'], priceMin: 20, priceMax: 80 }),
+    );
+    expect(query.brand_id).toEqual(['b1']);
+    expect(query.size).toEqual(['S']);
+    expect(query.price_min).toBe(20);
+    expect(query.price_max).toBe(80);
+  });
+
+  it('sends one end of a range without inventing the other', () => {
+    // "Under 50" is a real thing to ask; a floor of 0 is a different filter
+    // that would exclude anything with no price recorded.
+    const query = toQueryFilters(withFilters({ priceMax: 50 }));
+    expect(query.price_max).toBe(50);
+    expect(query.price_min).toBeUndefined();
+  });
+
+  it('asks the server what "recently added" means', () => {
+    // A window, not a date the client computed: a clock a day out would
+    // silently include or exclude a piece on the boundary.
+    expect(toQueryFilters(withFilters({ recentlyAdded: true })).added_within_days).toBe(30);
+  });
+
+  it('counts a price range as one filter, not two', () => {
+    expect(countActive(withFilters({ priceMin: 20, priceMax: 80 }))).toBe(1);
+  });
+
+  it('counts the new filters as active', () => {
+    expect(isEmpty(withFilters({ brandId: ['b1'] }))).toBe(false);
+    expect(isEmpty(withFilters({ size: ['S'] }))).toBe(false);
+    expect(isEmpty(withFilters({ recentlyAdded: true }))).toBe(false);
+    expect(isEmpty(withFilters({ priceMax: 50 }))).toBe(false);
+  });
+
+  it('names a brand chip rather than showing its id', () => {
+    const chips = appliedChips(withFilters({ brandId: ['b1'] }), new Map([['b1', 'Aritzia']]));
+    expect(chips.map((c) => c.label)).toContain('Aritzia');
+  });
+
+  it('skips a brand chip whose name has not loaded', () => {
+    // A uuid on a chip is worse than no chip at all.
+    expect(appliedChips(withFilters({ brandId: ['b1' ] }))).toHaveLength(0);
+  });
+
+  it('says a price range the way a person would', () => {
+    const label = (min: number | null, max: number | null) =>
+      appliedChips(withFilters({ priceMin: min, priceMax: max }))[0]?.label;
+
+    expect(label(20, 80)).toBe('20–80');
+    expect(label(null, 50)).toBe('Under 50');
+    expect(label(50, null)).toBe('Over 50');
+  });
+
+  it('removes each new filter in one tap', () => {
+    const start = withFilters({ brandId: ['b1'], size: ['S'], priceMax: 50, recentlyAdded: true });
+    const names = new Map([['b1', 'Aritzia']]);
+
+    let state = start;
+    for (const chip of appliedChips(start, names)) state = chip.remove(state);
+
+    expect(isEmpty(state)).toBe(true);
+  });
+});

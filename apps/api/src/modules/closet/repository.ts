@@ -263,6 +263,50 @@ export class GarmentRepository {
   }
 
   /** Several garments by id, for hydrating a look's constituent pieces. */
+  /**
+   * Sizes present in the closet.
+   *
+   * Same reasoning as brands: the taxonomy's full size list is long enough to
+   * bury the four sizes a person actually owns, and filtering by one they own
+   * nothing in is a guaranteed empty grid.
+   */
+  async sizesInCloset(scope: UserScope): Promise<{ size: string; count: number }[]> {
+    const { rows } = await scopedQuery<{ size: string; count: string }>(
+      this.db,
+      scope,
+      `select g.size_normalized as size, count(*) as count
+         from garments g
+        where g.user_id = $1 and g.deleted_at is null and g.status <> 'archived'
+          and g.size_normalized is not null
+        group by g.size_normalized
+        order by count desc, g.size_normalized asc`,
+      [scope.userId],
+    );
+    return rows.map((r) => ({ size: r.size, count: Number(r.count) }));
+  }
+
+  /**
+   * Brands present in the closet, with how many pieces each has.
+   *
+   * Resolved brands only. An unrecognized `brand_raw` cannot be filtered on —
+   * the filter takes a brand id — so listing it would offer a choice that does
+   * nothing.
+   */
+  async brandsInCloset(scope: UserScope): Promise<{ id: string; name: string; count: number }[]> {
+    const { rows } = await scopedQuery<{ id: string; name: string; count: string }>(
+      this.db,
+      scope,
+      `select b.id, b.name, count(*) as count
+         from garments g
+         join brands b on b.id = g.brand_id
+        where g.user_id = $1 and g.deleted_at is null and g.status <> 'archived'
+        group by b.id, b.name
+        order by count desc, b.name asc`,
+      [scope.userId],
+    );
+    return rows.map((r) => ({ id: r.id, name: r.name, count: Number(r.count) }));
+  }
+
   async findByIds(scope: UserScope, ids: string[]): Promise<GarmentRow[]> {
     if (ids.length === 0) return [];
     const { rows } = await scopedQuery<GarmentRow>(

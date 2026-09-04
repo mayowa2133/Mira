@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CATEGORIES, OCCASIONS, SEASONS } from '@mira/taxonomy';
 import { color, radius, space, type } from '@mira/ui';
@@ -14,7 +14,7 @@ import {
   toggleValue,
   type FilterState,
 } from './filter-state';
-import { useGarmentCount } from './queries';
+import { useClosetFacets, useGarmentCount } from './queries';
 
 /**
  * Filter sheet (`docs/02-design/screen-specs.md` §16, Reference 03 — SSENSE).
@@ -39,9 +39,11 @@ const SEASON_OPTIONS = asOptions(SEASONS);
 const OCCASION_OPTIONS = asOptions(OCCASIONS);
 const COLOR_OPTIONS = colorOptions();
 
+/** §16's status set, in its order. */
 const STATUS_TOGGLES = [
   { key: 'neverWorn', label: 'Never worn' },
   { key: 'tagsAttached', label: 'Still has tags' },
+  { key: 'recentlyAdded', label: 'Recently added' },
   { key: 'favorite', label: 'Favourite' },
   { key: 'laundry', label: 'In the laundry' },
 ] as const;
@@ -59,6 +61,30 @@ export function FilterSheet({ visible, initial, onClose, onApply }: FilterSheetP
   // Draft state: nothing reaches the grid until the CTA is tapped, and
   // dismissing the sheet discards the draft.
   const [draft, setDraft] = useState<FilterState>(initial);
+  const [brandQuery, setBrandQuery] = useState('');
+
+  const facets = useClosetFacets();
+  const matchingBrands = useMemo(() => {
+    const all = facets.data?.brands ?? [];
+    const query = brandQuery.trim().toLowerCase();
+    const matched = query ? all.filter((b) => b.name.toLowerCase().includes(query)) : all;
+    // Cap the unsearched list: sixty brand chips is a wall, and the search box
+    // above it is the way through.
+    return query ? matched : matched.slice(0, 12);
+  }, [facets.data?.brands, brandQuery]);
+
+  /**
+   * Parse a price field.
+   *
+   * An empty box means "no bound", not zero — a floor of zero would exclude
+   * every garment with no price recorded, which is most of a new closet.
+   */
+  const setPrice = (field: 'priceMin' | 'priceMax', text: string) => {
+    const trimmed = text.trim();
+    const value = trimmed === '' ? null : Number(trimmed);
+    if (value !== null && !Number.isFinite(value)) return;
+    setDraft((current) => ({ ...current, [field]: value }));
+  };
 
   // Re-seed the draft whenever the sheet is opened with different applied
   // filters, so it always reflects what is actually on the grid.
@@ -72,9 +98,10 @@ export function FilterSheet({ visible, initial, onClose, onApply }: FilterSheetP
   const count = useGarmentCount(queryFilters);
 
   const toggleList = useCallback(
-    (field: 'category' | 'color' | 'season' | 'occasion') => (value: string) => {
-      setDraft((prev) => ({ ...prev, [field]: toggleValue(prev[field], value) }));
-    },
+    (field: 'category' | 'color' | 'season' | 'occasion' | 'brandId' | 'size') =>
+      (value: string) => {
+        setDraft((prev) => ({ ...prev, [field]: toggleValue(prev[field], value) }));
+      },
     [],
   );
 
@@ -161,6 +188,96 @@ export function FilterSheet({ visible, initial, onClose, onApply }: FilterSheetP
             values={draft.season}
             onToggle={toggleList('season')}
           />
+
+          {/* §16: a searchable brand list. Searchable because a closet with
+              sixty brands is a scroll, and the one you want is the one you can
+              already name. */}
+          {(facets.data?.brands ?? []).length > 0 ? (
+            <>
+              <Text style={styles.groupLabel}>Brand</Text>
+              <TextInput
+                style={styles.search}
+                value={brandQuery}
+                onChangeText={setBrandQuery}
+                placeholder="Search brands"
+                placeholderTextColor={color.textTertiary}
+                autoCapitalize="none"
+                accessibilityLabel="Search brands"
+              />
+              <View style={styles.statusWrap}>
+                {matchingBrands.map((brand) => {
+                  const on = draft.brandId.includes(brand.id);
+                  return (
+                    <Pressable
+                      key={brand.id}
+                      onPress={() => toggleList('brandId')(brand.id)}
+                      style={[styles.statusChip, on && styles.statusChipActive]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}
+                      accessibilityLabel={`${brand.name}, ${brand.count} pieces${on ? ', selected' : ''}`}
+                    >
+                      <Text style={[styles.statusLabel, on && styles.statusLabelActive]}>
+                        {brand.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+                {matchingBrands.length === 0 ? (
+                  <Text style={styles.noMatch}>No brand matches “{brandQuery}”.</Text>
+                ) : null}
+              </View>
+            </>
+          ) : null}
+
+          {/* Sizes the closet actually contains — filtering by one you own
+              nothing in is a guaranteed empty grid. */}
+          {(facets.data?.sizes ?? []).length > 0 ? (
+            <>
+              <Text style={styles.groupLabel}>Size</Text>
+              <View style={styles.statusWrap}>
+                {(facets.data?.sizes ?? []).map((entry) => {
+                  const on = draft.size.includes(entry.size);
+                  return (
+                    <Pressable
+                      key={entry.size}
+                      onPress={() => toggleList('size')(entry.size)}
+                      style={[styles.statusChip, on && styles.statusChipActive]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}
+                      accessibilityLabel={`Size ${entry.size}, ${entry.count} pieces${on ? ', selected' : ''}`}
+                    >
+                      <Text style={[styles.statusLabel, on && styles.statusLabelActive]}>
+                        {entry.size}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          ) : null}
+
+          <Text style={styles.groupLabel}>Price</Text>
+          <View style={styles.priceRow}>
+            <TextInput
+              style={[styles.search, styles.priceInput]}
+              value={draft.priceMin === null ? '' : String(draft.priceMin)}
+              onChangeText={(text) => setPrice('priceMin', text)}
+              placeholder="Min"
+              placeholderTextColor={color.textTertiary}
+              keyboardType="decimal-pad"
+              accessibilityLabel="Minimum price"
+            />
+            <Text style={styles.priceDash}>–</Text>
+            <TextInput
+              style={[styles.search, styles.priceInput]}
+              value={draft.priceMax === null ? '' : String(draft.priceMax)}
+              onChangeText={(text) => setPrice('priceMax', text)}
+              placeholder="Max"
+              placeholderTextColor={color.textTertiary}
+              keyboardType="decimal-pad"
+              accessibilityLabel="Maximum price"
+            />
+          </View>
 
           <Text style={styles.groupLabel}>Status</Text>
           <View style={styles.statusWrap}>
@@ -253,6 +370,21 @@ const styles = StyleSheet.create({
   },
   statusChipActive: { backgroundColor: color.accentSoft, borderColor: color.accentSoft },
   statusLabel: { fontSize: type.subhead.fontSize, color: color.textSecondary },
+  search: {
+    minHeight: space.tapMin,
+    paddingHorizontal: space.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: color.divider,
+    backgroundColor: color.surface,
+    fontSize: type.body.fontSize,
+    color: color.text,
+    marginBottom: space.sm,
+  },
+  noMatch: { fontSize: type.subhead.fontSize, color: color.textSecondary },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  priceInput: { flex: 1 },
+  priceDash: { fontSize: type.body.fontSize, color: color.textSecondary },
   statusLabelActive: { color: color.text, fontWeight: type.bodyStrong.fontWeight },
 
   footer: {

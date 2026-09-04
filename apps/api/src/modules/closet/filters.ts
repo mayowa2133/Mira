@@ -52,6 +52,14 @@ export type GarmentFilters = {
   notWornSinceDays?: number;
   purchasedAfter?: string;
   purchasedBefore?: string;
+  /**
+   * §16's "Recently Added" status chip.
+   *
+   * A window rather than a date, because the chip means "lately" — and a
+   * client computing a cutoff would drift from the server's clock, which on a
+   * boundary day is the difference between a piece appearing and not.
+   */
+  addedWithinDays?: number;
   priceMin?: number;
   priceMax?: number;
 };
@@ -83,6 +91,9 @@ export function validateFilters(filters: GarmentFilters): void {
     if (filters.priceMin > filters.priceMax) {
       throw validationFailed([{ field: 'price_min', issue: 'must not exceed price_max' }]);
     }
+  }
+  if (filters.addedWithinDays !== undefined && filters.addedWithinDays <= 0) {
+    throw validationFailed([{ field: 'added_within_days', issue: 'must be positive' }]);
   }
   if (filters.notWornSinceDays !== undefined && filters.notWornSinceDays <= 0) {
     throw validationFailed([{ field: 'not_worn_since_days', issue: 'must be positive' }]);
@@ -158,6 +169,12 @@ export function buildFilterSql(filters: GarmentFilters, startIndex: number): Sql
       `(g.last_worn_at is null or g.last_worn_at < now() - make_interval(days => $${i}))`,
     );
     values.push(filters.notWornSinceDays);
+    i += 1;
+  }
+
+  if (filters.addedWithinDays !== undefined) {
+    clauses.push(`g.created_at >= now() - make_interval(days => $${i})`);
+    values.push(filters.addedWithinDays);
     i += 1;
   }
 

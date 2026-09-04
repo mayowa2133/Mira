@@ -72,6 +72,7 @@ export function parseListQuery(query: Record<string, unknown>): {
   setIf('tagsAttached', asBoolean(query['tags_attached']));
   setIf('neverWorn', asBoolean(query['never_worn']));
   setIf('notWornSinceDays', asNumber(query['not_worn_since_days']));
+  setIf('addedWithinDays', asNumber(query['added_within_days']));
   setIf('priceMin', asNumber(query['price_min']));
   setIf('priceMax', asNumber(query['price_max']));
   if (query['purchased_after']) filters.purchasedAfter = String(query['purchased_after']);
@@ -202,6 +203,18 @@ export async function registerClosetRoutes(
 
   app.get('/closet', { onRequest: requireAuth }, async (request) => {
     return service.summary(requireScope(request));
+  });
+
+  /**
+   * What this closet can be filtered by: its brands and its sizes.
+   *
+   * §16's sheet wants a searchable brand list and size chips, and the useful
+   * lists are the ones the user owns — offering every brand Mira knows about
+   * would let someone filter to a brand they have none of and see an empty
+   * grid with no explanation.
+   */
+  app.get('/closet/facets', { onRequest: requireAuth }, async (request) => {
+    return service.facets(requireScope(request));
   });
 
   app.get('/garments', { onRequest: requireAuth }, async (request) => {
