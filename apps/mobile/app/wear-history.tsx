@@ -270,9 +270,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 999,
-    // Dark enough to carry white text over any garment, sheer enough not to
-    // fight the photograph it sits on.
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    // The same scrim the camera uses to carry white text over a photograph.
+    // Dark enough for any garment, sheer enough not to fight the image.
+    backgroundColor: color.cameraScrim,
   },
 
   nothing: {
