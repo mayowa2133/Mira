@@ -13,6 +13,7 @@ import {
   useQueryClient,
   type InfiniteData,
 } from '@tanstack/react-query';
+import type { DuplicateCandidate } from './duplicate-sheet';
 import { request, toQuery } from '@/lib/api';
 
 /**
@@ -323,6 +324,34 @@ export function useCreateGarment() {
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ['garments'] });
       void client.invalidateQueries({ queryKey: closetKeys.summary });
+    },
+  });
+}
+
+/**
+ * Is this already in the closet?
+ *
+ * Called before every create (CAP-5). It is a mutation rather than a query
+ * because it is a question asked at a moment, about a payload that does not
+ * exist yet — caching the answer would mean answering about the previous draft.
+ *
+ * A failure here must never block a save: duplicate detection is a courtesy,
+ * and losing a garment because the check timed out would be a far worse bug
+ * than the duplicate it was trying to prevent (CAP-4). Callers treat an error
+ * as "no candidates".
+ */
+export function useCheckDuplicate() {
+  return useMutation({
+    mutationFn: async (payload: Record<string, unknown>) => {
+      try {
+        const result = await request<{ candidates: DuplicateCandidate[] }>(
+          '/garments/check-duplicate',
+          { method: 'POST', body: payload },
+        );
+        return result.candidates;
+      } catch {
+        return [];
+      }
     },
   });
 }

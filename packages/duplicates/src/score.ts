@@ -4,6 +4,7 @@
  */
 import {
   SIGNAL_STRENGTH,
+  bucketKeys,
   signalsBetween,
   type DuplicateSignal,
   type DuplicateSubject,
@@ -178,4 +179,72 @@ export function scoreAgainst(
   }
 
   return scored.sort((a, b) => b.score - a.score);
+}
+
+export type ScoredPair = DuplicateMatch & { a: string; b: string };
+
+/**
+ * Every pair in a closet worth mentioning.
+ *
+ * Powers "You might already own this" (`screen-specs.md` §26) — the surface §3
+ * sends the quiet band to, where browsing is the point and an interruption is
+ * not.
+ *
+ * Comparing every garment with every other one is quadratic, and a wardrobe is
+ * exactly the kind of collection that grows. So garments are grouped by the
+ * keys that make a signal possible at all, and only pairs landing in the same
+ * group are scored. `imagePairs` carries the one signal that cannot be a key,
+ * because a near-match is not an equality.
+ */
+export function findPairs(
+  subjects: readonly DuplicateSubject[],
+  options: { imagePairs?: readonly (readonly [string, string])[]; minScore?: number } = {},
+): ScoredPair[] {
+  const minScore = options.minScore ?? NOTE_THRESHOLD;
+
+  const byId = new Map<string, DuplicateSubject>();
+  for (const subject of subjects) if (subject.id) byId.set(subject.id, subject);
+
+  const buckets = new Map<string, string[]>();
+  for (const subject of byId.values()) {
+    for (const key of bucketKeys(subject)) {
+      const list = buckets.get(key) ?? [];
+      list.push(subject.id as string);
+      buckets.set(key, list);
+    }
+  }
+
+  // A pair is scored once, however many buckets it shares.
+  const seen = new Set<string>();
+  const pairs: [string, string][] = [];
+  const consider = (left: string, right: string) => {
+    if (left === right) return;
+    const [a, b] = left < right ? [left, right] : [right, left];
+    const key = `${a}|${b}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    pairs.push([a, b]);
+  };
+
+  for (const members of buckets.values()) {
+    for (let i = 0; i < members.length; i += 1) {
+      for (let j = i + 1; j < members.length; j += 1) {
+        consider(members[i] as string, members[j] as string);
+      }
+    }
+  }
+  for (const [left, right] of options.imagePairs ?? []) consider(left, right);
+
+  const scored: ScoredPair[] = [];
+  for (const [a, b] of pairs) {
+    const left = byId.get(a);
+    const right = byId.get(b);
+    if (!left || !right) continue;
+
+    const match = compare(left, right);
+    if (match.score < minScore) continue;
+    scored.push({ ...match, a, b });
+  }
+
+  return scored.sort((x, y) => y.score - x.score);
 }

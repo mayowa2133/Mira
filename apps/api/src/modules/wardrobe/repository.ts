@@ -130,6 +130,20 @@ export class WardrobeRepository {
   }
 
   /** Prices and wear counts for the aggregate stats. */
+  /** Named garments, for a surface that already knows which ids it wants. */
+  async insightGarments(scope: UserScope, ids: string[]): Promise<InsightGarmentRow[]> {
+    if (ids.length === 0) return [];
+    const { rows } = await scopedQuery<InsightGarmentRow>(
+      this.db,
+      scope,
+      `select ${COLUMNS}
+         from garments g
+        where g.user_id = $1 and ${ACTIVE} and g.id = any($2::uuid[])`,
+      [scope.userId, ids],
+    );
+    return rows;
+  }
+
   async priceAndWear(
     scope: UserScope,
   ): Promise<{ purchase_price: string | null; currency: string | null; worn_count: number }[]> {

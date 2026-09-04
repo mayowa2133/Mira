@@ -186,3 +186,42 @@ export function signalsBetween(a: DuplicateSubject, b: DuplicateSubject): Duplic
 
   return signals;
 }
+
+/**
+ * Keys under which this garment could meet another one.
+ *
+ * Two garments can only fire a signal if they share at least one of these, so
+ * grouping a closet by them turns "compare everything with everything" into a
+ * handful of small groups. Derived from `signalsBetween` above rather than
+ * written beside it, because a bucket that missed a signal would lose recall
+ * silently — the tests hold the two in agreement.
+ *
+ * `purchase_window` has no key, deliberately: it is the one signal that cannot
+ * surface anything on its own, so a pair sharing only a purchase date has
+ * nothing to say.
+ *
+ * Image hashes are absent too. A near-match is not an equality, so it cannot be
+ * a key — the caller pairs those up separately.
+ */
+export function bucketKeys(subject: DuplicateSubject): string[] {
+  const keys: string[] = [];
+
+  if (subject.barcode) keys.push(`barcode:${normalizeBarcode(subject.barcode)}`);
+  if (subject.sku && subject.retailer) {
+    keys.push(`sku:${normalizeSku(subject.sku)}@${normalizeBrand(subject.retailer)}`);
+  }
+  if (subject.productUrl) {
+    const url = normalizeProductUrl(subject.productUrl);
+    if (url) keys.push(`url:${url}`);
+  }
+  if (subject.sourceReference && ORDER_BEARING.has(subject.sourceType)) {
+    keys.push(`order:${subject.sourceType}:${subject.sourceReference}`);
+  }
+
+  // Both remaining signals — `brand_name` and `category_color_size_brand` —
+  // require the same brand, so one key covers them.
+  if (subject.brandId) keys.push(`brand:${subject.brandId}`);
+  else if (subject.brandRaw) keys.push(`brand:${normalizeBrand(subject.brandRaw)}`);
+
+  return keys;
+}

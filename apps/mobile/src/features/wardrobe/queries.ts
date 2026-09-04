@@ -56,3 +56,27 @@ export function useWardrobeStats() {
     queryFn: () => request<WardrobeStats>('/wardrobe/stats'),
   });
 }
+
+/** Two pieces that may be the same thing (`screen-specs.md` §26). */
+export type SimilarOwnedPair = {
+  a: InsightGarment;
+  b: InsightGarment;
+  /** Why, in words — "Same brand and a very similar name". Never a score. */
+  summary: string;
+};
+
+/**
+ * "You might already own this".
+ *
+ * The other end of `duplicate-detection.md` §3: a pair too quiet to interrupt a
+ * capture is raised here instead, where browsing is the point. The server has
+ * already dropped anything the user has ruled on, so an empty list means there
+ * is nothing to say rather than nothing to show.
+ */
+export function useSimilarOwned() {
+  return useQuery({
+    queryKey: ['wardrobe', 'similar-owned'],
+    queryFn: () => request<{ data: SimilarOwnedPair[] }>('/wardrobe/similar-owned'),
+    select: (response) => response.data,
+  });
+}

@@ -173,7 +173,12 @@ export class OutfitRepository {
    */
   async recordWear(
     scope: UserScope,
-    input: { garmentId: string | null; outfitId: string | null; wornOn: string; note: string | null },
+    input: {
+      garmentId: string | null;
+      outfitId: string | null;
+      wornOn: string;
+      note: string | null;
+    },
   ): Promise<{ id: string }> {
     const { rows } = await scopedQuery<{ id: string }>(
       this.db,

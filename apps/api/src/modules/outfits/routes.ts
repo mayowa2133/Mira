@@ -62,9 +62,7 @@ export async function registerOutfitRoutes(
   app.get('/outfits', { onRequest: requireAuth }, async (request) => {
     const query = request.query as Record<string, string | undefined>;
     const requested = query['tab'] ?? 'mine';
-    const tab = (TABS as readonly string[]).includes(requested)
-      ? (requested as OutfitTab)
-      : 'mine';
+    const tab = (TABS as readonly string[]).includes(requested) ? (requested as OutfitTab) : 'mine';
 
     const limit = Math.min(Number(query['limit'] ?? 50) || 50, 100);
     return { data: await service.list(requireScope(request), tab, limit) };

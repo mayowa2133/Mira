@@ -426,7 +426,8 @@ export class ClosetService {
     const target = await this.repo.findById(scope, resolution.garmentId);
     if (!target) throw notFound(ErrorCode.garmentNotFound);
 
-    const score = candidates.find((c) => c.existing_garment.id === resolution.garmentId)?.score ?? null;
+    const score =
+      candidates.find((c) => c.existing_garment.id === resolution.garmentId)?.score ?? null;
 
     if (resolution.relation === 'same_item') {
       return { garment: await this.mergeInto(scope, target, input), created: false };

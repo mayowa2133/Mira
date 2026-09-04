@@ -390,3 +390,111 @@ describe('merging (§5)', () => {
     expect(rows).toHaveLength(0);
   });
 });
+
+describe('You might already own this (§26, task 9.2)', () => {
+  dbIt('raises the quiet band where browsing is the point, not at capture', async () => {
+    const base = unique();
+    const first = await post(ALICE, base);
+    // Scores 0.55 — saved silently at capture (§3), surfaced here.
+    const second = await post(ALICE, { ...base, name: 'A Completely Different Cut' });
+    expect(second.statusCode).toBe(201);
+
+    const res = await app!.inject({
+      method: 'GET',
+      url: '/v1/wardrobe/similar-owned',
+      headers: await auth(ALICE),
+    });
+    expect(res.statusCode).toBe(200);
+
+    const ids = [first.json().id, second.json().id].sort();
+    const pair = res
+      .json()
+      .data.find(
+        (p: { a: { id: string }; b: { id: string } }) =>
+          [p.a.id, p.b.id].sort().join() === ids.join(),
+      );
+
+    expect(pair, `pair not surfaced\n${JSON.stringify(res.json().data, null, 2)}`).toBeTruthy();
+    // In words, never a score (D-011 is about confidence, and the reasoning
+    // here deserves the same treatment).
+    expect(pair.summary).toBe('Same brand, colour and size');
+    expect(pair).not.toHaveProperty('score');
+  });
+
+  dbIt('surfaces a pair whose ONLY signal is the photograph', async () => {
+    // Two garments with nothing else in common: different brands, different
+    // names, different colours. The pair exists solely because the photographs
+    // are near-identical.
+    //
+    // This is the case that a nomination alone cannot carry. Near-matching
+    // hashes NOMINATE the pair, but the score comes from comparing the two
+    // subjects — so if the hashes do not reach the scorer, the pair is
+    // nominated, scored at zero, and silently dropped.
+    const first = await post(ALICE, unique({ primary_color: 'black' }));
+    const second = await post(ALICE, unique({ primary_color: 'white' }));
+
+    const hashes = ['ffee00112233aabb', 'ffee00112233aabf'];
+    for (const [index, id] of [first.json().id, second.json().id].entries()) {
+      await pool!.query(
+        `insert into garment_images (garment_id, user_id, kind, storage_key, image_hash, is_canonical)
+         select $1, user_id, 'original', $2, $3, true from garments where id = $1`,
+        [id, `garments/${id}/original.jpg`, hashes[index]],
+      );
+    }
+
+    const res = await app!.inject({
+      method: 'GET',
+      url: '/v1/wardrobe/similar-owned',
+      headers: await auth(ALICE),
+    });
+
+    const ids = [first.json().id, second.json().id].sort().join();
+    const pair = res
+      .json()
+      .data.find(
+        (p: { a: { id: string }; b: { id: string } }) => [p.a.id, p.b.id].sort().join() === ids,
+      );
+
+    expect(pair, `photograph-only pair was lost\n${JSON.stringify(res.json().data)}`).toBeTruthy();
+    expect(pair.summary).toBe('Nearly the same photograph');
+  });
+
+  dbIt('stops asking once the user has said they own two', async () => {
+    const base = unique();
+    const first = await post(ALICE, base);
+    const second = await post(ALICE, {
+      ...base,
+      duplicate_resolution: { garment_id: first.json().id, relation: 'owns_two' },
+    });
+
+    const res = await app!.inject({
+      method: 'GET',
+      url: '/v1/wardrobe/similar-owned',
+      headers: await auth(ALICE),
+    });
+
+    const ids = [first.json().id, second.json().id].sort().join();
+    const found = res
+      .json()
+      .data.some(
+        (p: { a: { id: string }; b: { id: string } }) => [p.a.id, p.b.id].sort().join() === ids,
+      );
+
+    // The interruption budget of §1 is not spent on a question already
+    // answered.
+    expect(found).toBe(false);
+  });
+
+  dbIt('never crosses into another closet', async () => {
+    const base = unique();
+    await post(ALICE, base);
+    await post(MALLORY, base);
+
+    const res = await app!.inject({
+      method: 'GET',
+      url: '/v1/wardrobe/similar-owned',
+      headers: await auth(MALLORY),
+    });
+    expect(res.json().data).toEqual([]);
+  });
+});

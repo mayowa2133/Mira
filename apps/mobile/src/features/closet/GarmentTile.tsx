@@ -1,11 +1,5 @@
 import { memo, useCallback } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type AccessibilityActionEvent,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, View, type AccessibilityActionEvent } from 'react-native';
 import { Image } from 'expo-image';
 import { color, layout, radius, space, type } from '@mira/ui';
 import { imageSrc, type Garment } from './queries';

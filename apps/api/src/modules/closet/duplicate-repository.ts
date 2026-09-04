@@ -25,6 +25,25 @@ const MAX_CANDIDATES = 2000;
 
 export type ResolvedPair = { garmentId: string; relation: string };
 
+/** The columns a comparison needs, and nothing else. */
+export type SubjectRow = {
+  id: string;
+  name: string | null;
+  brand_id: string | null;
+  brand_raw: string | null;
+  category: string;
+  primary_color: string | null;
+  size_normalized: string | null;
+  size_raw: string | null;
+  barcode: string | null;
+  sku: string | null;
+  retailer: string | null;
+  product_url: string | null;
+  purchase_date: Date | null;
+  source_type: string;
+  source_reference: string | null;
+};
+
 export class DuplicateRepository {
   constructor(private readonly db: Queryable) {}
 
@@ -85,6 +104,44 @@ export class DuplicateRepository {
       ],
     );
     return rows;
+  }
+
+  /**
+   * The whole closet, in comparable form.
+   *
+   * For the surface that looks for pairs the user already owns (§26) rather
+   * than for one garment arriving. Deliberately narrow columns: this reads
+   * every row, and the imagery is fetched later for the handful that match.
+   */
+  async allSubjects(scope: UserScope): Promise<SubjectRow[]> {
+    const { rows } = await scopedQuery<SubjectRow>(
+      this.db,
+      scope,
+      `select id, name, brand_id, brand_raw, category, primary_color,
+              size_normalized, size_raw, barcode, sku, retailer, product_url,
+              purchase_date, source_type, source_reference
+         from garments
+        where user_id = $1 and deleted_at is null and status <> 'archived'`,
+      [scope.userId],
+    );
+    return rows;
+  }
+
+  /**
+   * Every pair this user has ruled on, as `a|b` keys.
+   *
+   * Including `same_item`, which should never appear — one of the two garments
+   * no longer exists — but costs nothing to exclude and would be a confusing
+   * thing to show if it ever did.
+   */
+  async allResolvedPairs(scope: UserScope): Promise<Set<string>> {
+    const { rows } = await scopedQuery<{ garment_a_id: string; garment_b_id: string }>(
+      this.db,
+      scope,
+      `select garment_a_id, garment_b_id from garment_duplicates where user_id = $1`,
+      [scope.userId],
+    );
+    return new Set(rows.map((row) => `${row.garment_a_id}|${row.garment_b_id}`));
   }
 
   /** Perceptual hashes across the user's closet, by garment. */

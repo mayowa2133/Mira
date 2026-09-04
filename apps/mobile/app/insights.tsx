@@ -6,7 +6,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
 import { ClosetGridSkeleton, ClosetState } from '@/features/closet/ClosetGrid';
 import { GarmentRail } from '@/features/wardrobe/GarmentRail';
-import { useInsights, useWardrobeStats, type Insight } from '@/features/wardrobe/queries';
+import { SimilarOwnedSection } from '@/features/wardrobe/SimilarOwnedSection';
+import {
+  useInsights,
+  useSimilarOwned,
+  useWardrobeStats,
+  type Insight,
+} from '@/features/wardrobe/queries';
 import { ApiError } from '@/lib/api';
 
 /**
@@ -28,6 +34,7 @@ export default function InsightsScreen() {
 
   const insights = useInsights();
   const stats = useWardrobeStats();
+  const similar = useSimilarOwned();
 
   const openGarment = (id: string) => router.push(`/garment/${id}`);
 
@@ -77,6 +84,10 @@ export default function InsightsScreen() {
         ))
       )}
 
+      {/* §26 places this among the insights, not with the numbers: it is
+          content about two garments, not a statistic. */}
+      <SimilarOwnedSection pairs={similar.data ?? []} onPressGarment={openGarment} />
+
       {/* Optional, collapsed by default (§26). */}
       {stats.data ? (
         <View style={styles.numbers}>
@@ -94,8 +105,8 @@ export default function InsightsScreen() {
           {numbersOpen ? (
             <View style={styles.numbersBody}>
               <Text style={styles.numbersLine}>
-                {formatMoney(stats.data.closet_value.total, stats.data.closet_value.currency)} across{' '}
-                {stats.data.closet_value.priced_pieces} pieces
+                {formatMoney(stats.data.closet_value.total, stats.data.closet_value.currency)}{' '}
+                across {stats.data.closet_value.priced_pieces} pieces
               </Text>
               {/* Stated, so the total reads as covering part of the closet
                   rather than all of it. */}

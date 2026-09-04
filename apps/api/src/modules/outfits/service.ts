@@ -225,7 +225,12 @@ export class OutfitService {
    */
   async recordWear(
     scope: UserScope,
-    input: { garmentId: string | null; outfitId: string | null; wornOn: string; note: string | null },
+    input: {
+      garmentId: string | null;
+      outfitId: string | null;
+      wornOn: string;
+      note: string | null;
+    },
   ) {
     if (!input.garmentId && !input.outfitId) {
       throw validationFailed([
@@ -278,7 +283,10 @@ export class OutfitService {
     return { created: created.length, ids: created.map((row) => row.id) };
   }
 
-  async wearEvents(scope: UserScope, range: { from: string | null; to: string | null; limit: number }) {
+  async wearEvents(
+    scope: UserScope,
+    range: { from: string | null; to: string | null; limit: number },
+  ) {
     return this.repo.wearEvents(scope, range);
   }
 

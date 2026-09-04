@@ -260,7 +260,18 @@ DELETE /try-on/:id                    hard delete
 GET    /wardrobe/insights             ?kinds=forgotten,never_worn,tags_attached,most_loved
 GET    /wardrobe/stats                closet value, cost per wear aggregates
 GET    /wardrobe/wear-history         ?from=&to=  → wears grouped by day
+GET    /wardrobe/similar-owned        pieces that may be the same thing
 ```
+
+`/wardrobe/similar-owned` is where duplicate detection's quiet band goes
+(`docs/06-ai/duplicate-detection.md` §3): a pair scoring 0.50–0.699 is saved
+without interrupting the capture and raised here instead, "in a context where
+browsing is the point". It returns PAIRS rather than a list of garments, which
+is why it is its own endpoint and not another `kind` — every client would
+otherwise have to branch on `kind` before it could read the payload.
+
+Pairs the user has already ruled on never come back. Each carries a `summary`
+in words ("Same brand and a very similar name") and never a score.
 
 Insights return hydrated garments so the client can render imagery without a
 second round trip.

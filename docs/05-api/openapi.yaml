@@ -875,7 +875,10 @@ paths:
             type: array
             items:
               type: string
-              enum: [forgotten, never_worn, tags_attached, most_loved, similar_owned, cost_per_wear, closet_value]
+              # `similar_owned` is its own endpoint below: it returns pairs,
+              # not a rail of garments. `cost_per_wear` and `closet_value` are
+              # aggregates and live on /wardrobe/stats.
+              enum: [forgotten, never_worn, tags_attached, most_loved]
           style: form
           explode: true
       responses:
@@ -886,9 +889,34 @@ paths:
               schema:
                 type: object
                 properties:
-                  insights:
+                  data:
                     type: array
-                    items: { type: object }
+                    items: { $ref: '#/components/schemas/Insight' }
+
+  /wardrobe/similar-owned:
+    get:
+      tags: [wardrobe]
+      summary: Pieces that may be the same thing
+      description: >-
+        Where duplicate detection's quiet band surfaces
+        (duplicate-detection.md §3). Pairs the user has ruled on are excluded.
+      responses:
+        '200':
+          description: Pairs, strongest first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        a: { $ref: '#/components/schemas/InsightGarment' }
+                        b: { $ref: '#/components/schemas/InsightGarment' }
+                        # In words, never a score.
+                        summary: { type: string }
 
   /jobs/{id}:
     parameters:
@@ -1235,6 +1263,32 @@ components:
     # decisive, and no source reference to recognize a re-imported order line.
     DuplicateCheckRequest:
       $ref: '#/components/schemas/GarmentCreate'
+
+    InsightGarment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, nullable: true }
+        brand: { type: string, nullable: true }
+        category: { type: string }
+        image_url: { type: string, nullable: true }
+        worn_count: { type: integer }
+        last_worn_at: { type: string, format: date-time, nullable: true }
+        cost_per_wear: { $ref: '#/components/schemas/Money' }
+
+    Insight:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [forgotten, never_worn, tags_attached, most_loved]
+        # A sentence about the closet, never a label on a figure (§26).
+        headline: { type: string }
+        # Everything that qualifies; `garments` is the rail's preview of it.
+        total: { type: integer }
+        garments:
+          type: array
+          items: { $ref: '#/components/schemas/InsightGarment' }
 
     DuplicateCandidate:
       type: object

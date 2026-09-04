@@ -11,14 +11,11 @@
 import type { UserScope } from '../../db/scope.js';
 import type { StorageDriver } from '@mira/storage';
 import type { GarmentRepository } from '../closet/repository.js';
+import type { DuplicateRepository, SubjectRow } from '../closet/duplicate-repository.js';
+import { findPairs, type DuplicateSubject } from '@mira/duplicates';
+import { SAME_IMAGE_MAX_DISTANCE, hammingDistance } from '@mira/imaging';
 import type { InsightGarmentRow, WardrobeRepository } from './repository.js';
-import {
-  closetValue,
-  costPerWear,
-  headlineFor,
-  shouldShow,
-  type InsightKind,
-} from './rules.js';
+import { closetValue, costPerWear, headlineFor, shouldShow, type InsightKind } from './rules.js';
 
 const ALL_KINDS: InsightKind[] = ['forgotten', 'never_worn', 'tags_attached', 'most_loved'];
 
@@ -44,12 +41,79 @@ export type Insight = {
   garments: InsightGarment[];
 };
 
+/** Two pieces the user may not realize are the same thing (§26). */
+export type SimilarOwnedPair = {
+  a: InsightGarment;
+  b: InsightGarment;
+  /** In words — "Same brand and a very similar name". Never a score. */
+  summary: string;
+};
+
+/**
+ * Enough to make the point, and few enough to stay a section rather than a
+ * list. §26 shows two.
+ */
+const SIMILAR_PAIRS = 6;
+
 export class WardrobeService {
   constructor(
     private readonly repo: WardrobeRepository,
     private readonly garments: GarmentRepository,
     private readonly storage: StorageDriver,
+    private readonly duplicates: DuplicateRepository,
   ) {}
+
+  /**
+   * "You might already own this" (`screen-specs.md` §26, task 9.2).
+   *
+   * The other end of `duplicate-detection.md` §3: everything scoring between
+   * 0.50 and 0.699 is saved silently at capture and raised HERE, "in a context
+   * where browsing is the point". So this is where the quiet band goes, along
+   * with anything stronger that the user has not yet answered.
+   *
+   * Pairs the user has already ruled on are gone for good — being asked twice
+   * about the same two bodysuits is the interruption budget of §1 spent on a
+   * question already answered.
+   */
+  async similarOwned(scope: UserScope): Promise<SimilarOwnedPair[]> {
+    // No closet-size gate, unlike every other insight. The others are
+    // statistical claims about a wardrobe — "17 pieces deserve another chance"
+    // is meaningless at four — and `rules.ts` declines them on a small closet
+    // for good reason. This one is a fact about two specific garments, and it
+    // is MORE useful early: noticing on the fifth piece that it is the second
+    // is exactly when it is worth saying.
+
+    const [rows, hashes, resolved] = await Promise.all([
+      this.duplicates.allSubjects(scope),
+      this.duplicates.imageHashes(scope),
+      this.duplicates.allResolvedPairs(scope),
+    ]);
+
+    const pairs = findPairs(
+      rows.map((row) => toSubject(row, hashes)),
+      { imagePairs: nearIdenticalPairs(hashes) },
+    )
+      .filter((pair) => !resolved.has(`${pair.a}|${pair.b}`))
+      .slice(0, SIMILAR_PAIRS);
+
+    if (pairs.length === 0) return [];
+
+    const ids = [...new Set(pairs.flatMap((pair) => [pair.a, pair.b]))];
+    const [garments, urls] = await Promise.all([
+      this.repo.insightGarments(scope, ids),
+      this.imageUrls(scope, ids),
+    ]);
+
+    const byId = new Map(garments.map((row) => [row.id, row]));
+
+    return pairs.flatMap((pair) => {
+      const a = byId.get(pair.a);
+      const b = byId.get(pair.b);
+      // A pair with one side missing is half a question.
+      if (!a || !b) return [];
+      return [{ a: this.serialize(a, urls), b: this.serialize(b, urls), summary: pair.summary }];
+    });
+  }
 
   async insights(scope: UserScope, kinds: InsightKind[] = ALL_KINDS): Promise<Insight[]> {
     const closetSize = await this.repo.closetSize(scope);
@@ -59,12 +123,13 @@ export class WardrobeService {
       collected.push({ kind, rows: await this.rowsFor(scope, kind) });
     }
 
-    const shown = collected.filter(({ kind, rows }) =>
-      shouldShow(closetSize, {
-        kind,
-        itemCount: rows.length,
-        ...(kind === 'most_loved' ? { topWearCount: rows[0]?.worn_count ?? 0 } : {}),
-      }).show,
+    const shown = collected.filter(
+      ({ kind, rows }) =>
+        shouldShow(closetSize, {
+          kind,
+          itemCount: rows.length,
+          ...(kind === 'most_loved' ? { topWearCount: rows[0]?.worn_count ?? 0 } : {}),
+        }).show,
     );
 
     // Signed once per garment across every insight: a forgotten piece is often
@@ -150,7 +215,9 @@ export class WardrobeService {
   async stats(scope: UserScope) {
     const rows = await this.repo.priceAndWear(scope);
 
-    const value = closetValue(rows.map((row) => (row.purchase_price === null ? null : Number(row.purchase_price))));
+    const value = closetValue(
+      rows.map((row) => (row.purchase_price === null ? null : Number(row.purchase_price))),
+    );
 
     // Averaged over pieces that have actually been worn AND have a price:
     // including unworn pieces would report the wardrobe as more expensive per
@@ -200,4 +267,62 @@ export class WardrobeService {
 
     return [...byDay.entries()].map(([worn_on, value]) => ({ worn_on, ...value }));
   }
+}
+
+/**
+ * A garment row, in the shape the scorer compares.
+ *
+ * The hashes must come along. `nearIdenticalPairs` only NOMINATES a pair; the
+ * score is computed by comparing the two subjects, so a subject with no hashes
+ * cannot fire `image_hash` — and a pair found by nothing but its photograph
+ * would have been nominated, scored at zero, and dropped.
+ */
+function toSubject(row: SubjectRow, hashes: Map<string, string[]>): DuplicateSubject {
+  return {
+    id: row.id,
+    name: row.name,
+    brandId: row.brand_id,
+    brandRaw: row.brand_raw,
+    category: row.category,
+    primaryColor: row.primary_color,
+    sizeNormalized: row.size_normalized,
+    sizeRaw: row.size_raw,
+    barcode: row.barcode,
+    sku: row.sku,
+    retailer: row.retailer,
+    productUrl: row.product_url,
+    purchaseDate: row.purchase_date ? row.purchase_date.toISOString().slice(0, 10) : null,
+    sourceType: row.source_type,
+    sourceReference: row.source_reference,
+    imageHashes: hashes.get(row.id) ?? [],
+  };
+}
+
+/**
+ * Garments photographed near-identically.
+ *
+ * A hash near-match is not an equality, so it cannot be a bucket key — these
+ * pairs are found by comparing hashes directly and handed to `findPairs`
+ * alongside the ones it groups itself. Quadratic in images rather than in
+ * garments, which for a wardrobe is a far smaller number.
+ */
+function nearIdenticalPairs(hashes: Map<string, string[]>): [string, string][] {
+  const entries = [...hashes.entries()];
+  const pairs: [string, string][] = [];
+
+  for (let i = 0; i < entries.length; i += 1) {
+    for (let j = i + 1; j < entries.length; j += 1) {
+      const [leftId, leftHashes] = entries[i] as [string, string[]];
+      const [rightId, rightHashes] = entries[j] as [string, string[]];
+
+      const close = leftHashes.some((left) =>
+        rightHashes.some((right) => {
+          const distance = hammingDistance(left, right);
+          return distance !== null && distance <= SAME_IMAGE_MAX_DISTANCE;
+        }),
+      );
+      if (close) pairs.push([leftId, rightId]);
+    }
+  }
+  return pairs;
 }

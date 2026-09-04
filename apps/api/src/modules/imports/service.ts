@@ -141,8 +141,7 @@ export class ImportsService {
    * this endpoint (SEC-5).
    */
   private async assertUsableUpload(scope: UserScope, uploadKey: string): Promise<void> {
-    const invalid = (message: string) =>
-      new ApiError(400, ErrorCode.uploadKeyInvalid, { message });
+    const invalid = (message: string) => new ApiError(400, ErrorCode.uploadKeyInvalid, { message });
 
     if (!isSafeStorageKey(uploadKey)) throw invalid('That upload key is not valid.');
 

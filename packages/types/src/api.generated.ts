@@ -1628,7 +1628,7 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    kinds?: ("forgotten" | "never_worn" | "tags_attached" | "most_loved" | "similar_owned" | "cost_per_wear" | "closet_value")[];
+                    kinds?: ("forgotten" | "never_worn" | "tags_attached" | "most_loved")[];
                 };
                 header?: never;
                 path?: never;
@@ -1643,7 +1643,52 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            insights?: Record<string, unknown>[];
+                            data?: components["schemas"]["Insight"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/wardrobe/similar-owned": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pieces that may be the same thing
+         * @description Where duplicate detection's quiet band surfaces (duplicate-detection.md §3). Pairs the user has ruled on are excluded.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Pairs, strongest first */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data?: {
+                                a?: components["schemas"]["InsightGarment"];
+                                b?: components["schemas"]["InsightGarment"];
+                                summary?: string;
+                            }[];
                         };
                     };
                 };
@@ -1941,6 +1986,25 @@ export interface components {
             confidence?: number;
         };
         DuplicateCheckRequest: components["schemas"]["GarmentCreate"];
+        InsightGarment: {
+            /** Format: uuid */
+            id?: string;
+            name?: string | null;
+            brand?: string | null;
+            category?: string;
+            image_url?: string | null;
+            worn_count?: number;
+            /** Format: date-time */
+            last_worn_at?: string | null;
+            cost_per_wear?: components["schemas"]["Money"];
+        };
+        Insight: {
+            /** @enum {string} */
+            kind?: "forgotten" | "never_worn" | "tags_attached" | "most_loved";
+            headline?: string;
+            total?: number;
+            garments?: components["schemas"]["InsightGarment"][];
+        };
         DuplicateCandidate: {
             existing_garment?: components["schemas"]["Garment"];
             score?: number;

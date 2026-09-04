@@ -29,11 +29,20 @@ export async function registerWardrobeRoutes(
     );
 
     return {
-      data: await service.insights(
-        requireScope(request),
-        requested.length > 0 ? requested : KINDS,
-      ),
+      data: await service.insights(requireScope(request), requested.length > 0 ? requested : KINDS),
     };
+  });
+
+  /**
+   * "You might already own this" (`screen-specs.md` §26, task 9.2).
+   *
+   * Separate from `/wardrobe/insights` because it is shaped differently: every
+   * other insight is a rail of garments, and this one is pairs. Folding pairs
+   * into the same list would make every client branch on `kind` before it could
+   * read the payload at all.
+   */
+  app.get('/wardrobe/similar-owned', { onRequest: requireAuth }, async (request) => {
+    return { data: await service.similarOwned(requireScope(request)) };
   });
 
   app.get('/wardrobe/stats', { onRequest: requireAuth }, async (request) => {
@@ -47,8 +56,7 @@ export async function registerWardrobeRoutes(
     // Defaults to the last three months, which is what the calendar shows.
     const to = query['to'] ?? new Date().toISOString().slice(0, 10);
     const from =
-      query['from'] ??
-      new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      query['from'] ?? new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     return { data: await service.wearHistory(requireScope(request), { from, to }) };
   });

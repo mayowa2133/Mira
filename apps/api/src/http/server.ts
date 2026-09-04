@@ -233,7 +233,12 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
       });
 
       await registerWardrobeRoutes(instance, {
-        service: new WardrobeService(new WardrobeRepository(pool), garments, storage),
+        service: new WardrobeService(
+          new WardrobeRepository(pool),
+          garments,
+          storage,
+          new DuplicateRepository(pool),
+        ),
       });
 
       const importsRepository = new ImportsRepository(pool);

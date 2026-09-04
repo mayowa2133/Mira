@@ -4,9 +4,11 @@ import {
   ASK_THRESHOLD,
   NOTE_THRESHOLD,
   bandFor,
+  bucketKeys,
   combine,
   compare,
   diceSimilarity,
+  findPairs,
   nameTokens,
   normalizeProductUrl,
   sameBrand,
@@ -310,5 +312,131 @@ describe('scoring a closet', () => {
   it('drops everything below the noticing threshold', () => {
     const unrelated = garment({ id: 'other', name: 'Wool Coat', brandRaw: 'Toteme' });
     expect(scoreAgainst(incoming, [unrelated])).toEqual([]);
+  });
+});
+
+describe('finding pairs across a closet', () => {
+  it('surfaces a pair that would only have been noted, never asked about', () => {
+    const a = garment({ id: 'a', brandRaw: 'Aritzia', primaryColor: 'black', sizeRaw: 'S' });
+    const b = garment({ id: 'b', brandRaw: 'Aritzia', primaryColor: 'black', sizeRaw: 'S' });
+
+    const [pair] = findPairs([a, b]);
+    expect(pair?.a).toBe('a');
+    expect(pair?.b).toBe('b');
+    expect(pair?.band).toBe('note');
+  });
+
+  it('scores a pair once however many things it has in common', () => {
+    const shared = {
+      brandRaw: 'Aritzia',
+      primaryColor: 'black',
+      sizeRaw: 'S',
+      barcode: '111',
+      productUrl: 'https://shop.com/p/1',
+    };
+    expect(
+      findPairs([garment({ id: 'a', ...shared }), garment({ id: 'b', ...shared })]),
+    ).toHaveLength(1);
+  });
+
+  it('leaves unrelated garments alone', () => {
+    expect(
+      findPairs([
+        garment({ id: 'a', brandRaw: 'Aritzia', name: 'Bodysuit' }),
+        garment({ id: 'b', brandRaw: 'Toteme', name: 'Wool Coat' }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it('pairs up near-identical photographs, which no key could', () => {
+    // A hash near-match is not an equality, so it cannot be a bucket key.
+    const a = garment({ id: 'a', imageHashes: ['ffee00112233aabb'] });
+    const b = garment({ id: 'b', imageHashes: ['ffee00112233aabf'] });
+
+    expect(findPairs([a, b])).toEqual([]);
+    expect(findPairs([a, b], { imagePairs: [['a', 'b']] })).toHaveLength(1);
+  });
+
+  it('never loses a pair the scorer would have found', () => {
+    // The property that makes bucketing safe: if two garments share any signal
+    // that can surface on its own, they share a bucket. A bucket that quietly
+    // missed a signal would cost recall with nothing failing.
+    //
+    // Written as a cross-product rather than one field at a time. The first
+    // version varied a single field per subject, which meant the compound
+    // signals — brand + name, SKU + retailer, category + colour + size + brand
+    // — could never fire on either side. It searched 3 pairs and covered 2 of
+    // the 6 signals, and passed. Hence `fired` below: a search that stops
+    // finding things must fail, not go quiet.
+    const AXES = {
+      brandRaw: [null, 'Aritzia', 'Toteme'],
+      name: [null, 'Contour Bodysuit', 'Contour Crew Bodysuit'],
+      primaryColor: [null, 'black'],
+      sizeRaw: [null, 'S'],
+      barcode: [null, '111'],
+      sku: [null, 'AB1'],
+      retailer: [null, 'SSENSE'],
+      productUrl: [null, 'https://shop.com/p/1'],
+      sourceType: ['manual', 'email'],
+      sourceReference: [null, 'order-1'],
+    } as const;
+
+    // One subject per combination is 3·3·2·2·2·2·2·2·2·2 = 2304, and squaring
+    // that is too many. Sampling deterministically covers every value of every
+    // axis many times over without the run time.
+    const subjects: DuplicateSubject[] = [];
+    let seed = 7;
+    const pick = <T>(values: readonly T[]): T => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      // The HIGH bits. A linear congruential generator with a power-of-two
+      // modulus has a period of 2 in its lowest bit, so `seed % 2` alternates
+      // — which made every two-valued axis perfectly correlated and stopped
+      // four of the six signals from ever firing.
+      return values[Math.floor(seed / 65536) % values.length] as T;
+    };
+
+    for (let i = 0; i < 220; i += 1) {
+      subjects.push(
+        garment({
+          id: `g${i}`,
+          brandRaw: pick(AXES.brandRaw),
+          name: pick(AXES.name),
+          primaryColor: pick(AXES.primaryColor),
+          sizeRaw: pick(AXES.sizeRaw),
+          barcode: pick(AXES.barcode),
+          sku: pick(AXES.sku),
+          retailer: pick(AXES.retailer),
+          productUrl: pick(AXES.productUrl),
+          sourceType: pick(AXES.sourceType),
+          sourceReference: pick(AXES.sourceReference),
+        }),
+      );
+    }
+
+    const fired = new Set<string>();
+    for (const a of subjects) {
+      for (const b of subjects) {
+        if (a.id === b.id) continue;
+
+        const signals = signalsBetween(a, b).filter(
+          (signal) => signal !== 'purchase_window' && signal !== 'image_hash',
+        );
+        if (signals.length === 0) continue;
+        for (const signal of signals) fired.add(signal);
+
+        const shared = bucketKeys(a).some((key) => bucketKeys(b).includes(key));
+        expect(shared, `${signals.join(',')} fired but no bucket was shared`).toBe(true);
+      }
+    }
+
+    // Every signal a bucket is supposed to cover was actually exercised.
+    expect([...fired].sort()).toEqual([
+      'barcode',
+      'brand_name',
+      'category_color_size_brand',
+      'order_line',
+      'product_url',
+      'sku_retailer',
+    ]);
   });
 });

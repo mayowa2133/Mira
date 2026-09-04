@@ -163,8 +163,8 @@ describe('buildChips', () => {
   });
 
   it('is empty rather than wrong when nothing is confident', () => {
-    expect(buildChips([attribute({ field: 'colors', value: ['black'], band: 'very_low' })])).toEqual(
-      [],
-    );
+    expect(
+      buildChips([attribute({ field: 'colors', value: ['black'], band: 'very_low' })]),
+    ).toEqual([]);
   });
 });

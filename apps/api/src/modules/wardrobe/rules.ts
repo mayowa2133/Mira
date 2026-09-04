@@ -33,11 +33,7 @@ export const MIN_ITEMS_PER_INSIGHT = 2;
 /** How many wears make a "most loved" piece meaningful rather than accidental. */
 export const MIN_WEARS_FOR_MOST_LOVED = 3;
 
-export type InsightKind =
-  | 'forgotten'
-  | 'never_worn'
-  | 'tags_attached'
-  | 'most_loved';
+export type InsightKind = 'forgotten' | 'never_worn' | 'tags_attached' | 'most_loved';
 
 export type InsightInput = {
   kind: InsightKind;
