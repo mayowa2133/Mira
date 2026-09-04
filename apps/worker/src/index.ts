@@ -10,13 +10,20 @@ import { stubProviders } from '@mira/ai';
 import { JOB_TYPES } from './jobs.js';
 import { runImageProcessLoop } from './image/runner.js';
 import { runAnalyzeLoop } from './analyze/runner.js';
+import { runDeletionLoop } from './deletion/runner.js';
 import type { ImageProcessPorts } from './image/process.js';
 import { derivedKey } from './image/keys.js';
 
 function log(level: 'info' | 'warn' | 'error', msg: string, fields: Record<string, unknown> = {}) {
   // eslint-disable-next-line no-console
   console.log(
-    JSON.stringify({ level, time: new Date().toISOString(), msg, service: 'mira-worker', ...fields }),
+    JSON.stringify({
+      level,
+      time: new Date().toISOString(),
+      msg,
+      service: 'mira-worker',
+      ...fields,
+    }),
   );
 }
 
@@ -70,7 +77,7 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => shutdown('SIGINT'));
 
   logger.info('worker started', {
-    registered_job_types: 2,
+    registered_job_types: 3,
     known_job_types: JOB_TYPES.length,
   });
 
@@ -78,8 +85,22 @@ async function main(): Promise<void> {
   // provider cannot stall image processing behind it.
   await Promise.all([
     runImageProcessLoop({ pool, ports, logger }, { signal: controller.signal }),
-    runAnalyzeLoop(
-      { pool, vision: stubProviders.vision, logger },
+    runAnalyzeLoop({ pool, vision: stubProviders.vision, logger }, { signal: controller.signal }),
+    // Deletion runs beside them, not behind them: it is the one piece of work
+    // here that a user is waiting on a promise about.
+    runDeletionLoop(
+      {
+        pool,
+        storage,
+        // No identity provider is configured, so a deletion cannot complete its
+        // final step and will retry. That is the honest behaviour — the
+        // alternative is marking an account deleted while its provider
+        // identity still exists (D-030).
+        identity: {
+          deleteIdentity: () => Promise.reject(new Error('no identity provider configured')),
+        },
+        logger,
+      },
       { signal: controller.signal },
     ),
   ]);

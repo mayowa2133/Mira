@@ -13,8 +13,8 @@
  * nothing above this layer changes.
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { mkdir, readFile, writeFile, unlink } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { mkdir, readFile, rm, writeFile, unlink } from 'node:fs/promises';
+import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join, normalize, resolve, sep } from 'node:path';
 
 /**
@@ -57,6 +57,19 @@ export interface StorageDriver {
    */
   exists(storageKey: string): Promise<boolean>;
   delete(storageKey: string): Promise<void>;
+  /**
+   * Remove everything a user owns in one bucket.
+   *
+   * `data-retention.md` step 6 is a prefix delete per bucket, and it exists
+   * because enumerating objects from the database cannot be trusted for this:
+   * the rows have already been deleted by then, and an object whose row was
+   * lost earlier — a failed write, an interrupted import — would otherwise
+   * survive the account it belonged to.
+   *
+   * Returns how many objects were removed, so a deletion job can say what it
+   * did rather than only that it finished.
+   */
+  deletePrefix(bucket: BucketName, userId: string): Promise<number>;
   verify(storageKey: string, userId: string, expires: number, signature: string): boolean;
 }
 
@@ -67,6 +80,16 @@ export interface StorageDriver {
  */
 export function buildStorageKey(bucket: BucketName, userId: string, ...parts: string[]): string {
   return [bucket, userId, ...parts].join('/');
+}
+
+/** Files beneath a directory, for reporting what a prefix delete removed. */
+function countFiles(directory: string): number {
+  let total = 0;
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const child = join(directory, entry.name);
+    total += entry.isDirectory() ? countFiles(child) : 1;
+  }
+  return total;
 }
 
 export function bucketOf(storageKey: string): BucketName | null {
@@ -195,6 +218,20 @@ export function createLocalStorage(options: LocalStorageOptions): StorageDriver 
     async delete(storageKey) {
       const path = pathFor(storageKey);
       if (existsSync(path)) await unlink(path);
+    },
+
+    async deletePrefix(bucket, userId) {
+      const prefix = buildStorageKey(bucket, userId);
+      // The same guard as every other path: a crafted user id must not be able
+      // to point this at a directory outside the root.
+      if (!isSafeStorageKey(prefix)) return 0;
+
+      const directory = pathFor(prefix);
+      if (!existsSync(directory)) return 0;
+
+      const before = countFiles(directory);
+      await rm(directory, { recursive: true, force: true });
+      return before;
     },
 
     verify(storageKey, userId, expires, signature) {
