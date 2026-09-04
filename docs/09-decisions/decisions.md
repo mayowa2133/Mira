@@ -498,3 +498,60 @@ Format:
   comes from the endpoint instead: the subject is taken from the verified actor
   and never from the request, and a mutation test holds that. The retained
   email is constrained to be cleared on completion, so "hard delete" stays true.
+
+## D-032 — Postgres stays; Clerk is a reasonable auth swap
+
+- **Date:** 2026-09-04 · **Status:** Accepted
+- **Decision:** Mira keeps PostgreSQL. Convex is **not** adopted as the
+  database. Clerk may replace Supabase Auth when task 0.5's client half is
+  built, adopted for developer experience rather than for cost.
+- **Why:** the question was raised as a cost decision — "Supabase gets
+  expensive, Convex is cheaper" — and cost is the one thing neither choice
+  moves. Mira's spend is images (an original plus two derivatives per garment,
+  plus egress) and, later, AI inference per analysis and try-on. Postgres is not
+  the bill.
+
+  Three things verified against Convex's own documentation make it the wrong
+  fit here, independent of price:
+
+  1. **Vector search cannot express Mira's filters.** Convex filters on
+     pre-declared `filterFields` with "exact equality on a single field, or an
+     `OR` of expressions", and returns at most 256 results. Six of the closet's
+     twenty filters are ranges — `priceMin`, `priceMax`, `notWornSinceDays`,
+     `addedWithinDays`, `purchasedAfter`, `purchasedBefore` — and four more are
+     array-contains (`season`, `occasion`, `material`, `styleTag`). Task 5.4
+     requires filters as **hard constraints** (INV-3). Post-filtering 256
+     results in application code cannot guarantee that: it can return nothing
+     while matches exist past the cut, which is exactly the "false inclusion
+     ≤ 0.01, recall@10 ≥ 0.90" pair 5.7 measures.
+  2. **No database-enforced cascade.** Convex offers cascading deletes through
+     triggers or the Ents library — in application code — and its own
+     documentation notes they "will fail if there are too many links" because a
+     long-lived transaction is not allowed. A user with 240 garments is
+     thousands of documents. D-031's whole argument was that deleting one row
+     and letting the database cascade means you **cannot forget a table**; the
+     guard test that caught `style_preferences` today has no equivalent.
+  3. **No row-level security.** SEC-5 requires repository scoping **and** RLS,
+     and says "neither mechanism may be the only one." Convex authorizes in
+     application code. That is a stated security requirement being dropped.
+
+  Scale, for completeness: this is not a database swap. Convex replaces the
+  backend — 129 raw SQL call sites, 7 repositories, 829 lines of migrations, 31
+  check constraints, 8 triggers, 5 `skip locked` claims, 8 integration test
+  files, Fastify and the worker process.
+- **Consequences:** Clerk is cheap to adopt because `IdentityProvider`
+  (D-030) already isolates the provider and verification is already JWKS-based
+  — roughly two days, and nothing else notices. Note that Clerk is *not* cheaper
+  than Supabase Auth at Mira's likely scale; it is chosen, if it is, for its
+  flows and DX.
+
+  If cost is the real concern, the lever is object storage: originals plus
+  derivatives with egress. Cloudflare R2's zero egress is the change that shows
+  on a bill, and `StorageDriver` already isolates it.
+
+  **What would change this answer:** wanting Convex for *reactivity* rather than
+  cost is a different and more honest argument — live queries would replace the
+  polling behind the analyzing→complete tile, and its scheduler could replace
+  the worker. That conversation has to happen before Phase 7, which adds
+  substantially more query surface. It should be reopened as its own decision,
+  not folded into a cost question.
