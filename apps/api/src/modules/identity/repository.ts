@@ -112,4 +112,24 @@ export class IdentityRepository {
     if (!closet) throw new Error('createDefaultCloset returned no row');
     return closet;
   }
+
+  /**
+   * Record how far the user got through onboarding.
+   *
+   * Takes a user id rather than a `UserScope` because it is the identity
+   * repository writing the identity's own row, and the id comes from the
+   * verified actor — there is no other user it could reach.
+   */
+  async setOnboardingState(
+    userId: string,
+    state: 'not_started' | 'in_progress' | 'completed' | 'skipped',
+  ): Promise<{ onboarding_state: string } | null> {
+    const { rows } = await this.db.query<{ onboarding_state: string }>(
+      `update users set onboarding_state = $2, updated_at = now()
+        where id = $1 and deleted_at is null
+        returning onboarding_state`,
+      [userId, state],
+    );
+    return rows[0] ?? null;
+  }
 }

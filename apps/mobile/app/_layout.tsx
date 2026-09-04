@@ -8,6 +8,7 @@ import { ApiError } from '@/lib/api';
 import { SnackbarProvider } from '@/ui/Snackbar';
 import { bootstrapDevAuth } from '@/lib/dev-auth';
 import { useDevInitialRoute } from '@/lib/dev-route';
+import { useLaunchRoute } from '@/features/onboarding/useLaunchRoute';
 import { useUploadQueue } from '@/features/capture/queue';
 
 // Development-only: real sign-in is task 0.5 and has no client yet. Inert in
@@ -49,6 +50,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <SnackbarProvider>
           <DevRoute />
+          <LaunchRoute />
           <UploadQueue />
           <StatusBar style="dark" />
           <Stack
@@ -58,6 +60,8 @@ export default function RootLayout() {
             }}
           >
             <Stack.Screen name="(tabs)" />
+            {/* A separate root stack, exited rather than popped (navigation.md 7). */}
+            <Stack.Screen name="onboarding" />
             <Stack.Screen name="garment/[id]" />
             <Stack.Screen name="add/manual" options={{ presentation: 'modal' }} />
             {/* Full-screen: the camera has no nav bar and no tab bar
@@ -95,5 +99,16 @@ function UploadQueue() {
 /** Development-only: see src/lib/dev-route.ts. Renders nothing. */
 function DevRoute() {
   useDevInitialRoute();
+  return null;
+}
+
+/**
+ * Decides between Welcome, the rest of onboarding, and Home (§1).
+ *
+ * A component rather than a hook call in the layout body so it re-renders on
+ * its own, without the whole navigator re-rendering behind it.
+ */
+function LaunchRoute() {
+  useLaunchRoute();
   return null;
 }

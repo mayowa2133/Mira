@@ -31,6 +31,7 @@ POST   /auth/session          exchange provider token → Mira session
 POST   /auth/refresh
 DELETE /auth/session          sign out
 GET    /auth/me
+PATCH  /auth/me               { onboarding_state } — the only writable field
 DELETE /auth/account          account deletion (see data-retention.md)
 ```
 

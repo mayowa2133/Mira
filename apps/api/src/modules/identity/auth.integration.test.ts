@@ -313,3 +313,66 @@ describe('DELETE /auth/account', () => {
     expect(rows.map((r) => r.provider_subject)).toEqual([ALICE]);
   });
 });
+
+describe('PATCH /auth/me', () => {
+  dbIt('records how far onboarding got', async () => {
+    await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(ALICE) });
+
+    const res = await app!.inject({
+      method: 'PATCH',
+      url: '/v1/auth/me',
+      headers: await auth(ALICE),
+      payload: { onboarding_state: 'completed' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().onboarding_state).toBe('completed');
+
+    // And it is what /auth/me reports next launch, which is what the launch
+    // router reads. Without this the router sends every account back to
+    // Welcome forever.
+    const me = await app!.inject({ method: 'GET', url: '/v1/auth/me', headers: await auth(ALICE) });
+    expect(me.json().onboarding_state).toBe('completed');
+  });
+
+  dbIt('refuses a state the schema does not allow', async () => {
+    const res = await app!.inject({
+      method: 'PATCH',
+      url: '/v1/auth/me',
+      headers: await auth(ALICE),
+      payload: { onboarding_state: 'nearly' },
+    });
+    expect(res.statusCode).toBe(422);
+  });
+
+  dbIt('will not let a client patch anything else', async () => {
+    await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(ALICE) });
+
+    await app!.inject({
+      method: 'PATCH',
+      url: '/v1/auth/me',
+      headers: await auth(ALICE),
+      payload: { onboarding_state: 'skipped', email: 'someone-else@example.com' },
+    });
+
+    // The rest of the profile comes from the identity provider; two writable
+    // sources of truth on an email address is one too many.
+    const me = await app!.inject({ method: 'GET', url: '/v1/auth/me', headers: await auth(ALICE) });
+    expect(me.json().email).toBe(`${ALICE}@mira.local`);
+  });
+
+  dbIt('changes only the caller’s own row', async () => {
+    await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(BOB) });
+    await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(ALICE) });
+
+    await app!.inject({
+      method: 'PATCH',
+      url: '/v1/auth/me',
+      headers: await auth(ALICE),
+      payload: { onboarding_state: 'completed' },
+    });
+
+    const bob = await app!.inject({ method: 'GET', url: '/v1/auth/me', headers: await auth(BOB) });
+    expect(bob.json().onboarding_state).toBe('not_started');
+  });
+});

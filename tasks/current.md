@@ -248,6 +248,39 @@ without a rebuild and restart, an endpoint added minutes ago returns 404 and
 the obvious conclusion is that the routing is wrong. This has now cost time
 twice.
 
+## Task 0.5 — auth and onboarding (partial)
+
+| Piece | Status |
+| ----- | ------ |
+| `POST /auth/session` | **Done** — idempotent bootstrap, returns the user and closet, never a token |
+| `PATCH /auth/me` | **Done** — `onboarding_state` only |
+| `POST /auth/refresh` | **Done**, delegated — 503 until a provider is configured |
+| `DELETE /auth/session` | **Done**, delegated — 503 until a provider is configured |
+| `DELETE /auth/account` | **Done** — 202, recorded in `account_deletions` |
+| Onboarding §1–5 | **Screens done** — welcome, value, account, build-your-closet |
+| Launch routing | **Done** — verified both ways on the simulator |
+| The deletion worker | **Not built** — the request is recorded, nothing acts on it |
+| Apple / Google / email sign-in | **Not built** — needs a configured provider |
+
+### What is NOT done, plainly
+
+**Nobody can actually sign in.** The three options on §4 fail with an inline
+message, because the provider SDKs and a configured Supabase project are the
+other half of 0.5. The screen offers "Look around first" so onboarding is not a
+wall, and the app still runs on the dev token in `apps/mobile/.env`.
+
+**A deletion request is recorded and then nothing happens.** `DELETE
+/auth/account` writes to `account_deletions` and revokes sessions; the ordered
+teardown in `data-retention.md` needs a worker that does not exist. Until it
+does, an account can ask to be deleted and will not be.
+
+**§1's splash is not a screen.** The launch decision happens in the root layout
+rather than behind a wordmark with a 900 ms budget. The routing is right and
+verified; the presentation is not built.
+
+0.5's exit criterion — "sign in on a device, land on an empty Home" — cannot be
+claimed while the first half of that sentence is impossible.
+
 ## Known flakes
 
 ### ~~Worker suite — one unexplained failure in ~10 runs~~ — EXPLAINED 2026-09-04

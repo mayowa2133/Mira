@@ -48,6 +48,32 @@ export async function registerIdentityRoutes(
   const { provider } = deps;
 
   /**
+   * Advance onboarding.
+   *
+   * `onboarding_state` lives on the user row and is returned by `/auth/me`, so
+   * the server owns it — but nothing could WRITE it, which meant the launch
+   * router would send every account back to Welcome forever. This is the only
+   * writable field: the rest of the profile comes from the identity provider,
+   * and letting a client patch `email` here would put two sources of truth on
+   * the same value.
+   */
+  app.patch('/auth/me', { onRequest: requireAuth }, async (request) => {
+    const actor = requireActor(request);
+    const body = parseBody(
+      z.object({
+        onboarding_state: z.enum(['not_started', 'in_progress', 'completed', 'skipped']),
+      }),
+      request.body,
+    );
+
+    const repo = new IdentityRepository(getPool());
+    const user = await repo.setOnboardingState(actor.userId, body.onboarding_state);
+    if (!user) throw new ApiError(401, ErrorCode.accountDeleted);
+
+    return { onboarding_state: user.onboarding_state };
+  });
+
+  /**
    * Exchange a verified provider identity for a Mira session
    * (`auth-contract.md` — Session flow).
    *
