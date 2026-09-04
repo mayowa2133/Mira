@@ -62,12 +62,27 @@ export const SAME_NAME_MIN_SIMILARITY = 0.8;
  * read as "different".
  */
 export function nameTokens(name: string, brand: string | null): string[] {
-  const tokens = tokenize(name);
+  const tokens = tokenize(name).map(singular);
   if (!brand) return tokens;
 
-  const brandTokens = new Set(tokenize(brand));
+  const brandTokens = new Set(tokenize(brand).map(singular));
   const stripped = tokens.filter((token) => !brandTokens.has(token));
   return stripped.length > 0 ? stripped : tokens;
+}
+
+/**
+ * Crude plural stripping, for names only.
+ *
+ * "Align Legging" and "Align Leggings" are one garment written twice, and as
+ * raw tokens they share only half their words. Deliberately not applied by
+ * `tokenize`, which also normalizes brands and SKUs — "Levis" is not "Levi".
+ *
+ * The `ss` guard keeps "dress" whole, which matters rather a lot here.
+ */
+function singular(token: string): string {
+  if (token.length <= 3) return token;
+  if (token.endsWith('ss')) return token;
+  return token.endsWith('s') ? token.slice(0, -1) : token;
 }
 
 /**
@@ -147,12 +162,42 @@ export function normalizeProductUrl(value: string): string | null {
   return `${host}${path}${query ? `?${query}` : ''}`;
 }
 
+/**
+ * Alpha sizes, spelled out and abbreviated.
+ *
+ * "S" and "Small" are one size written two ways, and until this existed they
+ * compared as different — which cost a true duplicate its only shared attribute
+ * and, worse, would register as a size CONFLICT once conflicts started counting
+ * against a pair.
+ */
+const ALPHA_SIZES: Record<string, string> = {
+  xxs: 'xxs',
+  xxsmall: 'xxs',
+  xs: 'xs',
+  xsmall: 'xs',
+  extrasmall: 'xs',
+  s: 's',
+  small: 's',
+  m: 'm',
+  med: 'm',
+  medium: 'm',
+  l: 'l',
+  large: 'l',
+  xl: 'xl',
+  xlarge: 'xl',
+  extralarge: 'xl',
+  xxl: 'xxl',
+  xxlarge: 'xxl',
+};
+
 /** A size, however it was written down. */
 export function normalizeSize(normalized: string | null, raw: string | null): string | null {
   const value = normalized ?? raw;
   if (!value) return null;
+
   const cleaned = tokenize(value).join('');
-  return cleaned.length > 0 ? cleaned : null;
+  if (cleaned.length === 0) return null;
+  return ALPHA_SIZES[cleaned] ?? cleaned;
 }
 
 /** Whole days between two ISO dates, or null if either is unusable. */

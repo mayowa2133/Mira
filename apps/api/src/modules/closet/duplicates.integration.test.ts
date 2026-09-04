@@ -456,7 +456,9 @@ describe('You might already own this (§26, task 9.2)', () => {
       );
 
     expect(pair, `photograph-only pair was lost\n${JSON.stringify(res.json().data)}`).toBeTruthy();
-    expect(pair.summary).toBe('Nearly the same photograph');
+    // The colours were made to differ so nothing else could match, and the
+    // summary now says so: a conflict is named rather than silently discounted.
+    expect(pair.summary).toBe('Nearly the same photograph, in a different colour');
   });
 
   dbIt('stops asking once the user has said they own two', async () => {

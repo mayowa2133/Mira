@@ -440,3 +440,91 @@ describe('finding pairs across a closet', () => {
     ]);
   });
 });
+
+describe('evidence against a pair', () => {
+  const staple = (color: string, size = 'S') =>
+    garment({ brandRaw: 'Everlane', name: 'Cotton Crew Tee', primaryColor: color, sizeRaw: size });
+
+  it('stops asking about a staple owned in two colours', () => {
+    // Same brand, same name, different colour. Before conflicts counted, this
+    // scored 0.72 and interrupted the save — and someone who owns a tee in
+    // three colours would have been asked about it every time.
+    const match = compare(staple('black'), { ...staple('white'), id: 'g2' });
+
+    expect(match.signals).toContain('brand_name');
+    expect(match.conflicts).toEqual(['primary_color']);
+    expect(match.band).toBe('note');
+  });
+
+  it('still raises it while browsing rather than dropping it', () => {
+    // `note` is not silence: §3 sends this band to "you might already own
+    // this". Two colours of one tee is worth mentioning, never worth asking.
+    expect(compare(staple('black'), { ...staple('white'), id: 'g2' }).score).toBeGreaterThanOrEqual(
+      0.5,
+    );
+  });
+
+  it('says nothing at all when colour AND size both disagree', () => {
+    const match = compare(staple('black', 'S'), { ...staple('white', 'L'), id: 'g2' });
+    expect(match.conflicts).toEqual(['primary_color', 'size']);
+    expect(match.band).toBe('ignore');
+  });
+
+  it('does not let a conflict overturn a barcode', () => {
+    // The same barcode with two recorded colours means one path misread the
+    // colour, not that there are two garments.
+    const match = compare(
+      garment({ barcode: '111', primaryColor: 'black' }),
+      garment({ id: 'g2', barcode: '111', primaryColor: 'grey' }),
+    );
+    expect(match.conflicts).toEqual(['primary_color']);
+    expect(match.band).toBe('ask');
+  });
+
+  it('treats an unknown colour as unknown, not as a difference', () => {
+    // Absent evidence is still not evidence of difference.
+    const match = compare(
+      garment({ brandRaw: 'Aritzia', name: 'Contour Bodysuit', primaryColor: 'black' }),
+      garment({ id: 'g2', brandRaw: 'Aritzia', name: 'Contour Bodysuit' }),
+    );
+    expect(match.conflicts).toEqual([]);
+    expect(match.band).toBe('ask_softly');
+  });
+
+  it('does not read a size written two ways as a conflict', () => {
+    const match = compare(
+      garment({ brandRaw: 'Aritzia', name: 'Contour Bodysuit', sizeRaw: 'S' }),
+      garment({ id: 'g2', brandRaw: 'Aritzia', name: 'Contour Bodysuit', sizeRaw: 'Small' }),
+    );
+    expect(match.conflicts).toEqual([]);
+  });
+
+  it('does not treat a category disagreement as a conflict', () => {
+    // The same jumpsuit is legitimately filed as `tops` on one path and `sets`
+    // on another; that is a taxonomy artefact as often as a real difference.
+    const match = compare(
+      garment({ brandRaw: 'Aritzia', name: 'Babaton Jumpsuit', category: 'tops' }),
+      garment({ id: 'g2', brandRaw: 'Aritzia', name: 'Babaton Jumpsuit', category: 'sets' }),
+    );
+    expect(match.conflicts).toEqual([]);
+  });
+
+  it('names the difference in the summary', () => {
+    expect(compare(staple('black'), { ...staple('white'), id: 'g2' }).summary).toBe(
+      'Same brand and a very similar name, in a different colour',
+    );
+  });
+
+  it('matches a plural against its singular', () => {
+    const match = compare(
+      garment({ brandRaw: 'Lululemon', name: 'Align Legging' }),
+      garment({ id: 'g2', brandRaw: 'Lululemon', name: 'Align Leggings' }),
+    );
+    expect(match.signals).toContain('brand_name');
+  });
+
+  it('does not stem a word into a different one', () => {
+    // "dress" must survive; the guard is the `ss` ending.
+    expect(nameTokens('Slip Dress', null)).toEqual(['slip', 'dress']);
+  });
+});

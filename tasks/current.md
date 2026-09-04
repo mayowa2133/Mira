@@ -195,7 +195,7 @@ weak evidence.
 | 4.5 | Multi-item confirmation list | **Not started** |
 | 4.6 | Duplicate detection: signals, scoring, thresholds | **Done** — eight of nine signals; the ninth needs Phase 5 embeddings |
 | 4.7 | Duplicate resolution sheet + merge + garment_duplicates | **Done** — API and sheet |
-| 4.8 | Evaluation: tags, receipts, duplicate pairs | **Not started** — needs the 50+50 pair dataset |
+| 4.8 | Evaluation: tags, receipts, duplicate pairs | **Duplicates done**; tags and receipts need a vision provider |
 
 ### What duplicate detection does NOT yet cover
 
@@ -209,9 +209,25 @@ documented difference from the manual path, not as coverage.
 model. The combination is additive, so it drops in when Phase 5 produces
 embeddings without moving a threshold.
 
-**Precision and recall are unmeasured.** §7 wants 50 duplicate pairs and 50
-similar-but-different pairs; neither exists. The scoring is unit-tested against
-the spec's own worked examples, which is not the same claim.
+**Measured, on a synthetic set.** `npm run evaluate:duplicates` runs 50
+duplicate pairs and 50 similar-but-different pairs (§7):
+
+| Metric | Target | Result |
+| ------ | ------ | ------ |
+| Precision @0.90 | ≥ 0.95 | **1.00** |
+| Recall @0.70 | ≥ 0.90 | **0.88** — see D-029 |
+| False-duplicate rate | ≤ 0.05 | **0.04** |
+| Noticed at all (≥0.50) | — | 0.96 |
+
+The dataset is synthetic and was authored alongside the scorer, so it measures
+internal consistency and guards regressions — it is NOT evidence of accuracy on
+real wardrobes. It earned its place immediately: the false-duplicate rate was
+**48%** on the first run, which is what produced D-028.
+
+Recall is short of target and is recorded rather than tuned away: the set
+contains pairs whose evidence is identical to pairs in the negative set, so no
+threshold separates them (D-029). Closing it needs visual embedding similarity,
+which arrives with Phase 5.
 
 ## Phase 9.2 — done
 

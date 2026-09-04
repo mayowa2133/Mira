@@ -5,7 +5,9 @@
 import {
   SIGNAL_STRENGTH,
   bucketKeys,
+  conflictsBetween,
   signalsBetween,
+  type DuplicateConflict,
   type DuplicateSignal,
   type DuplicateSubject,
   type SignalStrength,
@@ -80,7 +82,26 @@ export const SIGNAL_WEIGHT: Record<Exclude<SignalStrength, 'decisive'>, number> 
  * The one property to hold onto: every signal can only ever raise the score.
  * Absent evidence is not evidence of difference.
  */
-export function combine(signals: readonly DuplicateSignal[]): number {
+/**
+ * What one piece of contradicting evidence costs.
+ *
+ * Read off the bands, the same way the weights are (D-023): a single strong
+ * signal scores 0.72, and one conflict must move it out of "ask" and into
+ * "note" — 0.72 × 0.75 = 0.54. That is the behaviour the product wants for a
+ * staple owned in two colours: worth mentioning while browsing, never worth
+ * interrupting a save. Two conflicts compound to 0.405 and say nothing at all.
+ *
+ * A conflict cannot overturn a DECISIVE signal, because `combine` short-circuits
+ * before it applies. That is deliberate: the same barcode with two different
+ * recorded colours means one path misread the colour, not that there are two
+ * garments.
+ */
+export const CONFLICT_PENALTY = 0.75;
+
+export function combine(
+  signals: readonly DuplicateSignal[],
+  conflicts: readonly DuplicateConflict[] = [],
+): number {
   if (signals.some((signal) => SIGNAL_STRENGTH[signal] === 'decisive')) return DECISIVE_SCORE;
 
   let remaining = 1;
@@ -90,8 +111,10 @@ export function combine(signals: readonly DuplicateSignal[]): number {
     remaining *= 1 - SIGNAL_WEIGHT[strength];
   }
 
+  const score = (1 - remaining) * CONFLICT_PENALTY ** conflicts.length;
+
   // Three decimals, which is what garment_duplicates.detector_score stores.
-  return Math.round((1 - remaining) * 1000) / 1000;
+  return Math.round(score * 1000) / 1000;
 }
 
 /**
@@ -121,7 +144,15 @@ const ORDER: Record<SignalStrength, number> = {
   weak: 3,
 };
 
-export function summarize(signals: readonly DuplicateSignal[]): string {
+const CONFLICT_PHRASE: Record<DuplicateConflict, string> = {
+  primary_color: 'in a different colour',
+  size: 'in a different size',
+};
+
+export function summarize(
+  signals: readonly DuplicateSignal[],
+  conflicts: readonly DuplicateConflict[] = [],
+): string {
   const ranked = [...signals].sort((a, b) => ORDER[SIGNAL_STRENGTH[a]] - ORDER[SIGNAL_STRENGTH[b]]);
   const first = ranked[0];
   if (!first) return '';
@@ -131,11 +162,18 @@ export function summarize(signals: readonly DuplicateSignal[]): string {
   if (SIGNAL_STRENGTH[first] === 'decisive') return PHRASE[first];
 
   const second = ranked[1];
-  return second ? `${PHRASE[first]} · ${PHRASE[second]}` : PHRASE[first];
+  const agreement = second ? `${PHRASE[first]} · ${PHRASE[second]}` : PHRASE[first];
+
+  // Naming the difference matters more than naming a second agreement: this
+  // line is read while browsing, and "same name, different colour" is the whole
+  // story of a staple owned twice.
+  const difference = conflicts.map((c) => CONFLICT_PHRASE[c]).join(' and ');
+  return difference ? `${PHRASE[first]}, ${difference}` : agreement;
 }
 
 export type DuplicateMatch = {
   signals: DuplicateSignal[];
+  conflicts: DuplicateConflict[];
   score: number;
   band: DuplicateBand;
   summary: string;
@@ -144,8 +182,15 @@ export type DuplicateMatch = {
 /** Score one pair. */
 export function compare(a: DuplicateSubject, b: DuplicateSubject): DuplicateMatch {
   const signals = signalsBetween(a, b);
-  const score = combine(signals);
-  return { signals, score, band: bandFor(score), summary: summarize(signals) };
+  const conflicts = conflictsBetween(a, b);
+  const score = combine(signals, conflicts);
+  return {
+    signals,
+    conflicts,
+    score,
+    band: bandFor(score),
+    summary: summarize(signals, conflicts),
+  };
 }
 
 export type ScoredCandidate = DuplicateMatch & { garmentId: string };

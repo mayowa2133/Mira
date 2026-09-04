@@ -411,3 +411,49 @@ Format:
   `packages/types` regenerates from the spec, so the mobile client sees the
   corrected shapes without hand-editing — which is what caught the last
   contract drift, where a mobile type had been written to match a bug.
+
+## D-028 — A conflicting attribute counts against a pair
+
+- **Date:** 2026-09-04 · **Status:** Accepted
+- **Decision:** duplicate scoring now weighs evidence **against** a pair as well
+  as for it. A `primary_color` or `size` recorded on both garments that
+  *disagrees* multiplies the combined score by 0.75 per conflict. Decisive
+  signals are unaffected, because `combine` short-circuits before the penalty
+  applies.
+- **Why:** D-023 established that every signal can only raise a score — "absent
+  evidence is not evidence of difference." That was right about absence and
+  wrong about contradiction. A colour present on both records and differing is
+  not missing information; it is information. The evaluation set made the cost
+  measurable: the false-duplicate rate was **48%**, and every "same style,
+  different colour" and "same style, different size" pair was being interrupted.
+  Owning a staple in three colours is ordinary, and being asked about it three
+  times is §1's interruption budget spent on nothing.
+- **Consequences:** the penalty is read off the bands, like the weights: one
+  conflict moves a single strong signal from 0.72 to 0.54, out of "ask" and into
+  "note" — mentioned while browsing, never interrupting a save, which is exactly
+  right for a staple owned twice. Two conflicts compound to 0.405 and say
+  nothing. The false-duplicate rate fell to **4%** against a ≤5% target.
+  Category is deliberately NOT a conflict: the same jumpsuit is legitimately
+  filed as `tops` on one path and `sets` on another. Size normalization had to
+  learn alpha sizes first, or "S" against "Small" would have registered as a
+  conflict on a garment that is one garment.
+
+## D-029 — `Recall @0.70 ≥ 0.90` is not reachable on metadata alone
+
+- **Date:** 2026-09-04 · **Status:** Accepted
+- **Decision:** duplicate detection ships with recall at **0.88** against §7's
+  0.90 target, and the gap is recorded rather than closed by tuning.
+- **Why:** the evaluation set contains pairs whose evidence is *identical* to
+  pairs in the negative set. `dup-attributes-only` and
+  `neg-attributes-only-different-items` — same brand, colour, size and category,
+  nothing else known — both score 0.550, one labelled a duplicate and one not.
+  No threshold separates them, and both shapes occur in real closets. Lowering
+  the name-similarity bar to catch "Dress" against "Midi Dress" would fire on
+  "Kourtney Midi Dress" against "Kourtney Mini Dress", which is two dresses.
+- **Consequences:** the residual is not silence. **96%** of true duplicates
+  still score at or above 0.50, so they reach the user through "You might
+  already own this" (§26) rather than through a sheet — which is what §3 asks
+  for that band anyway. Closing the last 2% needs a signal the metadata does not
+  contain, and §2 names it: visual embedding similarity, which arrives with
+  Phase 5. The exit criterion should be read as **blocked on Phase 5**, not as
+  an open bug in the scorer.

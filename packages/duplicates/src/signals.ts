@@ -225,3 +225,36 @@ export function bucketKeys(subject: DuplicateSubject): string[] {
 
   return keys;
 }
+
+/**
+ * Evidence AGAINST a pair.
+ *
+ * `signalsBetween` is deliberately one-directional — absent evidence is not
+ * evidence of difference — and that was right for absence and wrong for
+ * contradiction. A colour recorded on BOTH garments that disagrees is not
+ * missing information; it is information, and it says these are two things.
+ *
+ * The evaluation set is what made this visible: every "same style, different
+ * colour" and "same style, different size" pair scored 0.72 and asked, because
+ * a matching brand and name fired while nothing could speak for the difference.
+ * Owning a staple in three colours is ordinary, and being asked about it three
+ * times is the interruption budget of §1 spent on nothing.
+ *
+ * Only colour and size. Category is NOT here: the same piece is legitimately
+ * filed as `tops` on one path and `sets` on another, so a category
+ * disagreement is as often a taxonomy artefact as a real difference.
+ */
+export type DuplicateConflict = 'primary_color' | 'size';
+
+export function conflictsBetween(a: DuplicateSubject, b: DuplicateSubject): DuplicateConflict[] {
+  const conflicts: DuplicateConflict[] = [];
+
+  const colors = both(a.primaryColor, b.primaryColor);
+  if (colors && colors[0] !== colors[1]) conflicts.push('primary_color');
+
+  const sizeA = normalizeSize(a.sizeNormalized, a.sizeRaw);
+  const sizeB = normalizeSize(b.sizeNormalized, b.sizeRaw);
+  if (sizeA !== null && sizeB !== null && sizeA !== sizeB) conflicts.push('size');
+
+  return conflicts;
+}
