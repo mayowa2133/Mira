@@ -320,6 +320,13 @@ GET    /preferences/notifications
 PUT    /preferences/notifications
 ```
 
+`PUT /preferences/style` is a full replacement, not a merge. Preferences are
+small and wholly replaceable, and a partial update cannot be checked against the
+fields it did not send — a request adding `minimal` to preferred could not know
+it already sat in avoided. A value outside the taxonomy is `not_in_taxonomy`
+(INV-1); wanting and avoiding the same thing is `validation_failed`, and the
+database refuses it too.
+
 ---
 
 ## Health

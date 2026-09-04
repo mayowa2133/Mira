@@ -58,7 +58,10 @@ export function setAuthToken(token: string | null): void {
 }
 
 export type RequestOptions = {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  // PUT is a full replacement, which the preferences endpoints use: they
+  // are small, wholly replaceable, and a partial update cannot be checked for
+  // contradiction against the fields it did not send.
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   /** Required on every creating POST (`docs/05-api/api-contract.md`). */
   idempotencyKey?: string;

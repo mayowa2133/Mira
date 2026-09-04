@@ -137,14 +137,24 @@ describe('the assumption the design rests on', () => {
     // in data-retention.md. That is only safe while this holds. A new table
     // with a user_id and no cascade would silently keep its rows after an
     // account is deleted, and this test is the thing that notices.
-    const { rows } = await pool!.query<{ table_name: string; delete_rule: string | null }>(
+    // Only FOREIGN KEY constraints. `style_preferences.user_id` is also its
+    // primary key, and counting the PK constraint as a non-cascading one made
+    // this fire on a table that cascades perfectly well.
+    const { rows } = await pool!.query<{ table_name: string; cascades: boolean }>(
       `select c.table_name,
-              rc.delete_rule
+              exists (
+                select 1
+                  from information_schema.table_constraints tc
+                  join information_schema.key_column_usage kcu
+                    on kcu.constraint_name = tc.constraint_name
+                  join information_schema.referential_constraints rc
+                    on rc.constraint_name = tc.constraint_name
+                 where tc.constraint_type = 'FOREIGN KEY'
+                   and tc.table_name = c.table_name
+                   and kcu.column_name = 'user_id'
+                   and rc.delete_rule = 'CASCADE'
+              ) as cascades
          from information_schema.columns c
-         left join information_schema.key_column_usage kcu
-           on kcu.table_name = c.table_name and kcu.column_name = c.column_name
-         left join information_schema.referential_constraints rc
-           on rc.constraint_name = kcu.constraint_name
         where c.table_schema = 'public' and c.column_name = 'user_id'`,
     );
 
@@ -152,7 +162,7 @@ describe('the assumption the design rests on', () => {
       // The deletion record itself must NOT cascade: it has to outlive the
       // user row to delete the provider identity and confirm afterwards.
       .filter((r) => r.table_name !== 'account_deletions')
-      .filter((r) => r.delete_rule !== 'CASCADE');
+      .filter((r) => !r.cascades);
 
     expect(offenders.map((o) => o.table_name)).toEqual([]);
   });

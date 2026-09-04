@@ -376,3 +376,114 @@ describe('PATCH /auth/me', () => {
     expect(bob.json().onboarding_state).toBe('not_started');
   });
 });
+
+describe('style preferences (task 11.1)', () => {
+  dbIt('starts empty rather than missing', async () => {
+    await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(ALICE) });
+
+    const res = await app!.inject({
+      method: 'GET', url: '/v1/preferences/style', headers: await auth(ALICE),
+    });
+
+    expect(res.statusCode).toBe(200);
+    // Absent and empty mean the same thing, so no caller has to tell them apart.
+    expect(res.json()).toEqual({
+      preferred_styles: [], avoided_styles: [], preferred_colors: [], avoided_colors: [],
+    });
+  });
+
+  dbIt('saves and returns what was saved', async () => {
+    await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(ALICE) });
+
+    const res = await app!.inject({
+      method: 'PUT',
+      url: '/v1/preferences/style',
+      headers: await auth(ALICE),
+      payload: {
+        preferred_styles: ['minimal'], avoided_styles: [],
+        preferred_colors: ['black'], avoided_colors: ['yellow'],
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().preferred_styles).toEqual(['minimal']);
+
+    const read = await app!.inject({
+      method: 'GET', url: '/v1/preferences/style', headers: await auth(ALICE),
+    });
+    expect(read.json().avoided_colors).toEqual(['yellow']);
+  });
+
+  dbIt('replaces rather than merges, because PUT means replace', async () => {
+    await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(ALICE) });
+    const body = (styles: string[]) => ({
+      preferred_styles: styles, avoided_styles: [], preferred_colors: [], avoided_colors: [],
+    });
+
+    await app!.inject({
+      method: 'PUT', url: '/v1/preferences/style', headers: await auth(ALICE),
+      payload: body(['minimal', 'classic']),
+    });
+    await app!.inject({
+      method: 'PUT', url: '/v1/preferences/style', headers: await auth(ALICE),
+      payload: body(['minimal']),
+    });
+
+    const read = await app!.inject({
+      method: 'GET', url: '/v1/preferences/style', headers: await auth(ALICE),
+    });
+    expect(read.json().preferred_styles).toEqual(['minimal']);
+  });
+
+  dbIt('refuses a value outside the taxonomy (INV-1)', async () => {
+    await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(ALICE) });
+
+    const res = await app!.inject({
+      method: 'PUT', url: '/v1/preferences/style', headers: await auth(ALICE),
+      payload: {
+        preferred_styles: ['not-a-real-style'], avoided_styles: [],
+        preferred_colors: [], avoided_colors: [],
+      },
+    });
+    expect(res.statusCode).toBe(422);
+    expect(res.json().error.code).toBe('not_in_taxonomy');
+  });
+
+  dbIt('refuses a contradiction at the database as well as the service', async () => {
+    // The check constraint is the second mechanism; neither is permitted to be
+    // the only one.
+    await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(ALICE) });
+    const me = await app!.inject({
+      method: 'GET', url: '/v1/auth/me', headers: await auth(ALICE),
+    });
+
+    await expect(
+      pool!.query(
+        `insert into style_preferences (user_id, preferred_styles, avoided_styles)
+         values ($1, '{minimal}', '{minimal}')
+         on conflict (user_id) do update set
+           preferred_styles = excluded.preferred_styles,
+           avoided_styles = excluded.avoided_styles`,
+        [me.json().id],
+      ),
+    ).rejects.toThrow();
+  });
+
+  dbIt('never returns another user’s preferences', async () => {
+    await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(ALICE) });
+    await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(BOB) });
+
+    await app!.inject({
+      method: 'PUT', url: '/v1/preferences/style', headers: await auth(ALICE),
+      payload: {
+        preferred_styles: ['minimal'], avoided_styles: [],
+        preferred_colors: [], avoided_colors: [],
+      },
+    });
+
+    const bob = await app!.inject({
+      method: 'GET', url: '/v1/preferences/style', headers: await auth(BOB),
+    });
+    expect(bob.json().preferred_styles).toEqual([]);
+  });
+});
