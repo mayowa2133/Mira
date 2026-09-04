@@ -71,6 +71,7 @@ export default function RootLayout() {
                 it is a moment in the capture flow, not a place in the closet. */}
             <Stack.Screen name="review/[id]" options={{ presentation: 'modal' }} />
             <Stack.Screen name="look/[id]" />
+            <Stack.Screen name="insights" />
             <Stack.Screen name="outfit/new" options={{ presentation: 'modal' }} />
           </Stack>
         </SnackbarProvider>

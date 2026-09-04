@@ -164,6 +164,26 @@ Only the Looks library has been seen on a simulator. The builder and look detail
 typecheck and their API is tested, which this session has repeatedly shown is
 weak evidence.
 
+## Phase 9 status
+
+| # | Task | Status |
+| - | ---- | ------ |
+| 9.1 | Insight computations | **Done** — verified on the real closet |
+| 9.2 | Similar-owned detection | **Not started** — needs duplicate detection |
+| 9.3 | Cost per wear + closet value | **Done** |
+| 9.4 | Wardrobe insights screen | **Done** — verified on simulator |
+| 9.5 | Wear history calendar | **API done**; the calendar screen is not built |
+| 9.6 | Home rediscovery cards | **Done** — verified on simulator |
+
+### Exit criteria
+
+- [x] **Insights degrade gracefully on a small or new closet** — every rule can
+      decline, and a closet under 12 pieces is told nothing at all. Home shows
+      "Keep building your closet" under 10 (§13).
+- [~] **No screen in this phase reads as a dashboard** — a judgement no test can
+      settle. What is held structurally: the numbers are collapsed until asked
+      for, rails lead with a sentence, and Home has no counts-first block.
+
 ## Known flakes
 
 ### ~~Worker suite — one unexplained failure in ~10 runs~~ — EXPLAINED 2026-09-04
