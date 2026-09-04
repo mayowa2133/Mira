@@ -169,7 +169,7 @@ weak evidence.
 | # | Task | Status |
 | - | ---- | ------ |
 | 9.1 | Insight computations | **Done** — verified on the real closet |
-| 9.2 | Similar-owned detection | **Not started** — needs duplicate detection |
+| 9.2 | Similar-owned detection | **Done** — `GET /wardrobe/similar-owned` and a section on the insights screen |
 | 9.3 | Cost per wear + closet value | **Done** |
 | 9.4 | Wardrobe insights screen | **Done** — verified on simulator |
 | 9.5 | Wear history calendar | **API done**; the calendar screen is not built |
