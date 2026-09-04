@@ -56,7 +56,10 @@ const EMPTY: Record<OutfitTab, { message: string; hint?: string; action: string;
 export default function LooksScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [tab, setTab] = useState<OutfitTab>('mine');
+  // The first tab, as §22 lists them. It opened on `mine` — the fourth — which
+  // contradicted the visual order for no stated reason, and meant a tap on
+  // Looks landed somewhere other than where the eye starts.
+  const [tab, setTab] = useState<OutfitTab>('saved');
 
   const outfits = useOutfits(tab);
 
