@@ -20,6 +20,7 @@ import {
   useRestoreGarment,
   useSetStatus,
   useToggleFavorite,
+  imageSrc,
 } from '@/features/closet/queries';
 import { useSnackbar } from '@/ui/Snackbar';
 import {
@@ -205,6 +206,7 @@ export default function GarmentDetailScreen() {
   }
 
   const g = garment.data;
+  const detailImage = imageSrc(g.canonical_image, 'medium');
   const brand = g.brand?.name ?? g.brand_raw;
   const subtitle = [titleCase(g.primary_color), g.size.normalized ?? g.size.raw]
     .filter(Boolean)
@@ -217,12 +219,14 @@ export default function GarmentDetailScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={[styles.hero, { height: width * 1.15 }]}>
-        {g.canonical_image ? (
+        {detailImage ? (
           <Image
             style={styles.heroImage}
-            source={{ uri: g.canonical_image.url }}
+            // 1080px is the detail budget; the original is kept for
+            // re-analysis and try-on, not for display.
+            source={{ uri: detailImage }}
             placeholder={
-              g.canonical_image.blurhash ? { blurhash: g.canonical_image.blurhash } : undefined
+              g.canonical_image?.blurhash ? { blurhash: g.canonical_image.blurhash } : undefined
             }
             contentFit="cover"
             transition={200}

@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { color, radius, space, type } from '@mira/ui';
 import type { CaptureEntry } from './queue-core';
+import { captureFileUri } from './preprocess';
 
 /**
  * A capture that is in the closet but not yet on the server (task 2.6).
@@ -45,7 +46,11 @@ export function PendingTile({ entry, onRetry, onDiscard }: PendingTileProps) {
       }}
     >
       <View style={styles.imageWrap}>
-        <Image style={styles.image} source={{ uri: entry.localUri }} contentFit="cover" />
+        <Image
+          style={styles.image}
+          source={{ uri: captureFileUri(entry.fileName) }}
+          contentFit="cover"
+        />
         {/* A soft veil, not a spinner: the photo is the reassurance. */}
         <View style={[styles.veil, failed && styles.veilFailed]} />
       </View>

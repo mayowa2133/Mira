@@ -61,6 +61,48 @@ Evidence, rather than "it builds":
 `takePictureAsync` is unexercised — the capture tests reach the same code path
 through the photo library. Real-device capture remains a manual check.
 
+## Phase 2 status
+
+| # | Task | Status |
+| - | ---- | ------ |
+| 2.1 | Camera screen, full-screen, minimal chrome | **Done** — verified under XCUITest |
+| 2.2 | Local-first capture + upload queue surviving app kill | **Done** — offline→reconnect verified end to end |
+| 2.3 | Direct-to-storage upload with scoped keys | **Done** (Phase 1 shipped it; the PUT was broken until Phase 2) |
+| 2.4 | image.process: derivatives, blurhash, perceptual hash | **Done** — served to the client |
+| 2.5 | Segmentation + quality gate + canonical selection | **Code done**; no segmentation provider yet, so the stub returns null and the original stays canonical |
+| 2.6 | Optimistic "analyzing" tile | **Done** — verified offline, where it matters most |
+| 2.7 | Photo library import, incl. iOS limited selection | **Done** — limited selection is a supported mode, not an error |
+
+### Exit criteria
+
+- [x] **Capture → visible in closet < 1 s (PERF-3)** — the tile renders from the
+      local file, so it does not wait on the network at all. Verified with the
+      API stopped.
+- [x] **Segmentation failure keeps the original and still creates the garment** —
+      every failure path is tested independently (provider down, provider
+      returns nothing, cutout fails the gate, all derivative writes fail).
+- [x] **Airplane-mode capture uploads on reconnect** — verified on device:
+      API stopped, photo captured, API restored, app relaunched, closet went
+      234 → 235 with no user action
+      (`apps/mobile/scripts/verify-offline-capture.sh`).
+
+**Not covered:** the shutter. The simulator has no camera, so
+`takePictureAsync` is unexercised; the tests reach the same code path through
+the photo library. Real-device capture remains a manual check.
+
+## Known flakes
+
+### Worker suite — one unexplained failure in ~10 runs
+
+`promotes an accepted cutout to canonical` failed once during a full `verify`
+with "1 row, expected 2", and has passed 10 consecutive runs since, including
+six back to back. The symptom means `recordResult` threw and rolled back, but
+the runner's error was discarded by a silent test logger.
+
+Not claimed as fixed. The logger now records what the runner reported and
+assertions include it, so a recurrence will explain itself instead of costing
+another investigation.
+
 ## Blocked
 
 ### ~~B-5 — No queue transport between API and worker~~ — CLEARED 2026-09-03
@@ -76,11 +118,11 @@ derivative files, width/height/blurhash and a 16-character perceptual hash
 recorded on every image. Segmentation has no provider yet, so the stub returns
 null and the original stays canonical — a specified path, not a failure.
 
-**Still not served:** thumb/medium derivatives are written to storage but the
-API has no way to return them. `garment_images` has no column for a variant and
-the image contract has no field, so the grid still loads full-size originals.
-That is the remaining piece of task 2.4 and needs a schema and contract change,
-not a worker change.
+Derivatives are now served: migration 0005 adds `thumb_key`/`medium_key`, the
+worker records them, and the API returns `thumb_url`/`medium_url` — each signed
+for the requesting user, because a derivative is exactly as private as the
+photograph it came from. The grid uses the 400px thumb and detail the 1080px
+medium; the original is kept for re-analysis and try-on, not for display.
 
 ### ~~B-2 — No iOS Simulator~~ — CLEARED 2026-09-03
 

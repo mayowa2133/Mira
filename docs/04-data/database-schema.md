@@ -170,6 +170,8 @@ garment_id   uuid not null references garments(id) on delete cascade
 user_id      uuid not null references users(id) on delete cascade
 kind         text not null              -- taxonomy §13
 storage_key  text not null              -- private bucket: garments
+thumb_key    text                       -- 400px WebP derivative
+medium_key   text                       -- 1080px WebP derivative
 width        integer
 height       integer
 blurhash     text
@@ -181,6 +183,13 @@ deleted_at   timestamptz
 
 unique (garment_id, is_canonical) where is_canonical
 ```
+
+`thumb_key` and `medium_key` are nullable on purpose: `image-processing.md` §8
+requires that a derivative failure never costs the user their garment, so an
+image whose derivatives failed is still a valid row and the original serves in
+the meantime. They are columns rather than a child table because a variant is a
+property of one image, always exactly these two, always produced together — a
+join here would sit in the closet grid, the hottest query in the product.
 
 ## garment_attributes
 

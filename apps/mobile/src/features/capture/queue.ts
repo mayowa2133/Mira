@@ -11,7 +11,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { Directory, File, Paths } from 'expo-file-system';
 import { ApiError, request } from '@/lib/api';
 import { CAPTURE_DIR } from './preprocess-core';
-import { discardCapture } from './preprocess';
+import { captureFileUri, discardCapture } from './preprocess';
 import {
   EMPTY_QUEUE,
   enqueue as enqueueEntry,
@@ -90,7 +90,7 @@ export function getQueueState(): QueueState {
 /** Add a prepared capture and start working immediately. */
 export function enqueueCapture(input: {
   id: string;
-  localUri: string;
+  fileName: string;
   source: 'camera' | 'photo_library';
 }): void {
   setState(
@@ -142,12 +142,15 @@ async function advance(entry: CaptureEntry): Promise<void> {
 
     setState(markImported(state, entry.id, imported.garment_id));
   } catch (error) {
-    const retryable = error instanceof ApiError ? error.isRetryable : true;
+    const apiError = error instanceof ApiError ? error : null;
     setState(
       markFailure(state, entry.id, {
         now: Date.now(),
         error: error instanceof Error ? error.message : 'Upload failed',
-        retryable,
+        retryable: apiError ? apiError.isRetryable : true,
+        // Being offline is not the upload failing — it is the upload not having
+        // happened yet, so it must not age the entry toward giving up.
+        offline: apiError?.isOffline ?? false,
       }),
     );
   }
@@ -162,7 +165,8 @@ async function upload(entry: CaptureEntry): Promise<string> {
     body: { purpose: 'garment', content_type: 'image/jpeg', filename: `${entry.id}.jpg` },
   });
 
-  const file = new File(entry.localUri);
+  // Resolved fresh each time: the container id can change between launches.
+  const file = new File(captureFileUri(entry.fileName));
   if (!file.exists) throw new Error('The photo is no longer on this device.');
 
   const response = await fetch(target.upload_url, {
@@ -183,7 +187,7 @@ function sweep(): void {
   const finished = collectable(state);
   if (finished.length === 0) return;
 
-  for (const entry of finished) discardCapture(entry.localUri);
+  for (const entry of finished) discardCapture(entry.fileName);
   setState(finished.reduce((next, entry) => remove(next, entry.id), state));
 }
 
@@ -194,7 +198,7 @@ export function retryCapture(id: string): void {
 
 export function discardFailedCapture(id: string): void {
   const entry = state.entries.find((candidate) => candidate.id === id);
-  if (entry) discardCapture(entry.localUri);
+  if (entry) discardCapture(entry.fileName);
   setState(remove(state, id));
 }
 

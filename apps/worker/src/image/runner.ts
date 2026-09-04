@@ -63,6 +63,10 @@ export async function processOneJob(deps: RunnerDeps): Promise<boolean> {
       height: report.height,
       blurhash: report.blurhash,
       imageHash: report.imageHash,
+      // Absent when generation failed — the original serves in the meantime
+      // (image-processing.md §8), so this must not become an error.
+      thumbKey: report.derivatives.find((d) => d.name === 'thumb')?.storageKey ?? null,
+      mediumKey: report.derivatives.find((d) => d.name === 'medium')?.storageKey ?? null,
       // Only an ACCEPTED cutout becomes canonical. A rejected one is discarded
       // and the original keeps the position (image-processing.md §3).
       cutoutStorageKey:

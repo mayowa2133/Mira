@@ -41,8 +41,13 @@ class MiraUITestCase: XCTestCase {
     }
 
     /// Captures that are on the device but not yet on the server.
+    ///
+    /// Matched across ALL element types, not `app.buttons`. A pending tile is
+    /// an `image` until it fails and becomes a tappable `button` — the role
+    /// legitimately changes with its state, so a query that pins a type finds
+    /// nothing exactly when the capture is behaving normally.
     var pendingCaptures: XCUIElementQuery {
-        app.buttons.matching(identifier: "pending-capture")
+        app.descendants(matching: .any).matching(identifier: "pending-capture")
     }
 
     /// The closet grid, chosen by height.

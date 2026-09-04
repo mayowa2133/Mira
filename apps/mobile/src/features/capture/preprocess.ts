@@ -23,11 +23,22 @@ function captureDirectory(): Directory {
 }
 
 export type PreparedCapture = {
-  /** A file we own, inside our own document directory. */
-  localUri: string;
+  /**
+   * File name only. Resolve it with `captureFileUri` when you need a URI.
+   *
+   * Absolute paths are deliberately not returned: iOS changes the app's data
+   * container id on reinstall, so an absolute path that outlives an update
+   * points at nothing and the photograph looks lost (REL-2).
+   */
+  fileName: string;
   width: number;
   height: number;
 };
+
+/** The current absolute URI for a stored capture. */
+export function captureFileUri(fileName: string): string {
+  return new File(captureDirectory(), fileName).uri;
+}
 
 /**
  * Downscale, strip metadata, compress, and persist under our control.
@@ -59,13 +70,13 @@ export async function prepareCapture(sourceUri: string, id: string): Promise<Pre
   // flight would look exactly like a capture that vanished.
   await new File(saved.uri).move(destination);
 
-  return { localUri: destination.uri, width: saved.width, height: saved.height };
+  return { fileName: `${id}.jpg`, width: saved.width, height: saved.height };
 }
 
 /** Remove a capture's local copy once it is safely in the closet. */
-export function discardCapture(localUri: string): void {
+export function discardCapture(fileName: string): void {
   try {
-    const file = new File(localUri);
+    const file = new File(captureDirectory(), fileName);
     if (file.exists) file.delete();
   } catch {
     // A capture we cannot delete is a small amount of wasted disk, not a

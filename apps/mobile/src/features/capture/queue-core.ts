@@ -21,8 +21,15 @@ export type CaptureStatus =
 
 export type CaptureEntry = {
   id: string;
-  /** Local file URI. The photograph, which we must not lose (REL-2). */
-  localUri: string;
+  /**
+   * File NAME, relative to the captures directory — never an absolute URI.
+   *
+   * iOS changes an app's data-container UUID on reinstall, so a stored absolute
+   * path goes stale and the photograph looks deleted when it is sitting right
+   * there under the new container. That is how a capture gets orphaned across
+   * an app update, which REL-2 exists to prevent.
+   */
+  fileName: string;
   source: 'camera' | 'photo_library';
   status: CaptureStatus;
   attempts: number;
@@ -51,6 +58,15 @@ export const EMPTY_QUEUE: QueueState = { entries: [] };
  */
 export const MAX_ATTEMPTS = 6;
 
+/**
+ * How long to wait before re-checking while offline.
+ *
+ * Short, and deliberately not exponential: the app also retries on foreground,
+ * so this only has to catch the case where connectivity returns while the app
+ * is already open.
+ */
+export const OFFLINE_RETRY_MS = 5_000;
+
 /** Exponential with a ceiling: 2s, 4s, 8s, 16s, 32s, 60s. */
 export function backoffMs(attempts: number): number {
   return Math.min(60_000, 2_000 * 2 ** Math.max(0, attempts - 1));
@@ -58,14 +74,14 @@ export function backoffMs(attempts: number): number {
 
 export function enqueue(
   state: QueueState,
-  entry: Pick<CaptureEntry, 'id' | 'localUri' | 'source' | 'idempotencyKey'> & { now: number },
+  entry: Pick<CaptureEntry, 'id' | 'fileName' | 'source' | 'idempotencyKey'> & { now: number },
 ): QueueState {
   return {
     entries: [
       ...state.entries,
       {
         id: entry.id,
-        localUri: entry.localUri,
+        fileName: entry.fileName,
         source: entry.source,
         status: 'pending',
         attempts: 0,
@@ -123,14 +139,35 @@ export function markImported(state: QueueState, id: string, garmentId: string): 
  * `retryable: false` is for a server saying the request itself is wrong — a
  * rejected format, a key that will never be valid. Retrying that is just a
  * slower way to fail, and it keeps a broken entry churning the radio.
+ *
+ * `offline: true` is different from both, and the distinction is the whole
+ * point of the queue. Being offline is not the upload failing; it is the
+ * upload not having been attempted yet. Counting it toward MAX_ATTEMPTS meant
+ * a capture taken on a plane exhausted six attempts in about a minute and gave
+ * up long before landing — which is exactly the case the exit criterion
+ * ("airplane-mode capture uploads on reconnect") exists to cover.
+ *
+ * So an offline result backs off but does NOT age the entry. The photograph
+ * waits as long as it has to.
  */
 export function markFailure(
   state: QueueState,
   id: string,
-  options: { now: number; error: string; retryable: boolean },
+  options: { now: number; error: string; retryable: boolean; offline?: boolean },
 ): QueueState {
   const entry = state.entries.find((candidate) => candidate.id === id);
   if (!entry) return state;
+
+  if (options.offline) {
+    return patch(state, id, {
+      lastError: options.error,
+      status: 'pending',
+      // Backoff is based on a separate, non-persisting notion of "how long have
+      // we been waiting", capped low: when the network returns we want to
+      // notice quickly, not sit out a 60-second sleep.
+      nextAttemptAt: options.now + OFFLINE_RETRY_MS,
+    });
+  }
 
   const attempts = entry.attempts + 1;
   const exhausted = !options.retryable || attempts >= MAX_ATTEMPTS;
@@ -184,10 +221,23 @@ export function inFlight(state: QueueState): CaptureEntry[] {
  */
 export function rehydrate(state: QueueState, now: number): QueueState {
   return {
-    entries: state.entries.map((entry) =>
-      entry.status === 'uploading' || entry.status === 'importing'
-        ? { ...entry, status: 'pending', nextAttemptAt: now }
-        : entry,
-    ),
+    entries: state.entries.map((entry) => {
+      const repaired = { ...entry, fileName: basename(entry.fileName) };
+      return repaired.status === 'uploading' || repaired.status === 'importing'
+        ? { ...repaired, status: 'pending', nextAttemptAt: now }
+        : repaired;
+    }),
   };
+}
+
+/**
+ * Reduce anything path-shaped to its file name.
+ *
+ * Repairs entries written before this was relative, rather than stranding a
+ * photograph whose container id has since changed.
+ */
+export function basename(value: string): string {
+  const withoutQuery = value.split('?')[0] ?? value;
+  const last = withoutQuery.split('/').pop();
+  return last && last.length > 0 ? last : withoutQuery;
 }

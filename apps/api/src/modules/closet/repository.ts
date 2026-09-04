@@ -60,6 +60,8 @@ export type GarmentImageRow = {
   garment_id: string;
   kind: string;
   storage_key: string;
+  thumb_key: string | null;
+  medium_key: string | null;
   width: number | null;
   height: number | null;
   blurhash: string | null;
@@ -248,7 +250,8 @@ export class GarmentRepository {
     const { rows } = await scopedQuery<GarmentImageRow>(
       this.db,
       scope,
-      `select id, garment_id, kind, storage_key, width, height, blurhash, is_canonical, position
+      `select id, garment_id, kind, storage_key, thumb_key, medium_key,
+              width, height, blurhash, is_canonical, position
          from garment_images
         where user_id = $1 and garment_id = any($2::uuid[]) and deleted_at is null
         order by garment_id, position`,

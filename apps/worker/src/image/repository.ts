@@ -121,6 +121,9 @@ export type ProcessedImage = {
   height: number;
   blurhash: string;
   imageHash: string;
+  /** Null when derivative generation failed; the original serves meanwhile. */
+  thumbKey: string | null;
+  mediumKey: string | null;
   /** Set only when a cutout passed the quality gate. */
   cutoutStorageKey: string | null;
 };
@@ -144,7 +147,8 @@ export async function recordResult(
 
     await client.query(
       `update garment_images
-          set width = $3, height = $4, blurhash = $5, image_hash = $6
+          set width = $3, height = $4, blurhash = $5, image_hash = $6,
+              thumb_key = $7, medium_key = $8
         where user_id = $1 and id = $2`,
       [
         job.userId,
@@ -153,6 +157,8 @@ export async function recordResult(
         result.height,
         result.blurhash,
         result.imageHash,
+        result.thumbKey,
+        result.mediumKey,
       ],
     );
 
@@ -175,13 +181,17 @@ export async function recordResult(
         // the closet shows (taxonomy §13).
         await client.query(
           `insert into garment_images
-             (garment_id, user_id, kind, storage_key, width, height,
-              blurhash, image_hash, is_canonical, position)
-           values ($2, $1, 'cleaned', $3, $4, $5, $6, $7, true, 0)`,
+             (garment_id, user_id, kind, storage_key, thumb_key, medium_key,
+              width, height, blurhash, image_hash, is_canonical, position)
+           values ($2, $1, 'cleaned', $3, $4, $5, $6, $7, $8, $9, true, 0)`,
           [
             job.userId,
             garmentId,
             result.cutoutStorageKey,
+            // The derivatives describe the same pixels, so the cleaned row
+            // carries them too rather than falling back to the full original.
+            result.thumbKey,
+            result.mediumKey,
             result.width,
             result.height,
             result.blurhash,

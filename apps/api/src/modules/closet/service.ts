@@ -48,12 +48,49 @@ function money(amount: string | null, currency: string | null) {
   return { amount: Number(amount), currency };
 }
 
+/**
+ * One image, in the shape `docs/05-api/api-contract.md` documents.
+ *
+ * `thumb_url` and `medium_url` are null until `image.process` has run, or if
+ * derivative generation failed — clients fall back to `url` rather than showing
+ * nothing (`image-processing.md` §8).
+ */
+function serializeImage(image: {
+  id: string;
+  kind: string;
+  url: string;
+  thumbUrl: string | null;
+  mediumUrl: string | null;
+  urlExpiresAt: string;
+  width: number | null;
+  height: number | null;
+  blurhash: string | null;
+  isCanonical: boolean;
+  position: number;
+}) {
+  return {
+    id: image.id,
+    kind: image.kind,
+    url: image.url,
+    thumb_url: image.thumbUrl,
+    medium_url: image.mediumUrl,
+    url_expires_at: image.urlExpiresAt,
+    width: image.width,
+    height: image.height,
+    blurhash: image.blurhash,
+    is_canonical: image.isCanonical,
+    position: image.position,
+  };
+}
+
 function serializeGarmentSync(
   row: GarmentRow,
   images: {
     id: string;
     kind: string;
     url: string;
+    thumbUrl: string | null;
+    mediumUrl: string | null;
     urlExpiresAt: string;
     width: number | null;
     height: number | null;
@@ -116,8 +153,13 @@ function serializeGarmentSync(
       last_worn_at: row.last_worn_at?.toISOString() ?? null,
       cost_per_wear: costPerWear,
     },
-    images,
-    canonical_image: images.find((i) => i.isCanonical) ?? images[0] ?? null,
+    // Serialized here rather than passed through: the contract is snake_case,
+    // and `isCanonical` was leaking camelCase into responses.
+    images: images.map(serializeImage),
+    canonical_image: (() => {
+      const canonical = images.find((i) => i.isCanonical) ?? images[0] ?? null;
+      return canonical ? serializeImage(canonical) : null;
+    })(),
     analysis_state: row.analysis_state,
     ai_confidence: row.ai_confidence === null ? null : Number(row.ai_confidence),
     created_at: row.created_at.toISOString(),
@@ -149,11 +191,26 @@ export class ClosetService {
       rows.map(async (row) => {
         const images = await Promise.all(
           (byGarment.get(row.id) ?? []).map(async (image) => {
-            const signed = await this.storage.signedReadUrl(image.storage_key, scope.userId);
+            // Every variant is signed for THIS user. A derivative is as
+            // private as the photograph it came from (SEC-4).
+            const [signed, thumb, medium] = await Promise.all([
+              this.storage.signedReadUrl(image.storage_key, scope.userId),
+              image.thumb_key
+                ? this.storage.signedReadUrl(image.thumb_key, scope.userId)
+                : null,
+              image.medium_key
+                ? this.storage.signedReadUrl(image.medium_key, scope.userId)
+                : null,
+            ]);
+
             return {
               id: image.id,
               kind: image.kind,
               url: signed.url,
+              // Null until image.process has run, or if it failed. Clients fall
+              // back to `url` rather than showing nothing (§8).
+              thumbUrl: thumb?.url ?? null,
+              mediumUrl: medium?.url ?? null,
               urlExpiresAt: signed.expiresAt,
               width: image.width,
               height: image.height,

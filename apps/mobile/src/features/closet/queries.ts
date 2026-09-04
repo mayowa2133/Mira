@@ -15,17 +15,45 @@ import {
 } from '@tanstack/react-query';
 import { request, toQuery } from '@/lib/api';
 
+/**
+ * Matches `GarmentImage` in `docs/05-api/openapi.yaml`.
+ *
+ * Snake_case, like the rest of the contract. This type previously used
+ * camelCase and was correct — about the API, which was serving camelCase in
+ * violation of its own spec. Both are fixed; the spec was always right.
+ */
 export type GarmentImage = {
   id: string;
   kind: string;
+  /** Full-size original. Always present. */
   url: string;
-  urlExpiresAt: string;
+  /** 400px. Null until image.process has run, or if derivatives failed. */
+  thumb_url: string | null;
+  /** 1080px. Same nullability. */
+  medium_url: string | null;
+  url_expires_at: string;
   width: number | null;
   height: number | null;
   blurhash: string | null;
-  isCanonical: boolean;
+  is_canonical: boolean;
   position: number;
 };
+
+/**
+ * The smallest image that will do.
+ *
+ * Falling back to the original is deliberate rather than defensive: a garment
+ * photographed seconds ago has no derivatives yet, and showing the full-size
+ * photo is far better than showing nothing (`image-processing.md` §8).
+ */
+export function imageSrc(
+  image: GarmentImage | null | undefined,
+  size: 'thumb' | 'medium',
+): string | null {
+  if (!image) return null;
+  if (size === 'thumb') return image.thumb_url ?? image.medium_url ?? image.url;
+  return image.medium_url ?? image.url;
+}
 
 export type Garment = {
   id: string;

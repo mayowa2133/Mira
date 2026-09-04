@@ -39,7 +39,7 @@ export default function ScanScreen() {
     async (uri: string, source: 'camera' | 'photo_library') => {
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       const prepared = await prepareCapture(uri, id);
-      enqueueCapture({ id, localUri: prepared.localUri, source });
+      enqueueCapture({ id, fileName: prepared.fileName, source });
 
       // §9: "a subtle `Got it.` confirmation before routing to review."
       //

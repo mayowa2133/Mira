@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   EMPTY_QUEUE,
   MAX_ATTEMPTS,
+  OFFLINE_RETRY_MS,
   backoffMs,
   collectable,
   enqueue,
@@ -11,6 +12,7 @@ import {
   markUploaded,
   markUploading,
   nextRunnable,
+  basename,
   rehydrate,
   remove,
   retry,
@@ -22,7 +24,7 @@ const T0 = 1_000_000;
 function withCapture(state: QueueState, id: string, now = T0): QueueState {
   return enqueue(state, {
     id,
-    localUri: `file:///captures/${id}.jpg`,
+    fileName: `${id}.jpg`,
     source: 'camera',
     idempotencyKey: `idem-${id}`,
     now,
@@ -108,7 +110,7 @@ describe('failure handling', () => {
     // The photograph is the thing the user cares about: a failed upload must
     // not become lost data.
     expect(collectable(state)).toEqual([]);
-    expect(state.entries[0]?.localUri).toBe('file:///captures/a.jpg');
+    expect(state.entries[0]?.fileName).toBe('a.jpg');
   });
 
   it('lets a user retry deliberately, clearing the backoff', () => {
@@ -200,5 +202,115 @@ describe('lifecycle', () => {
       retryable: true,
     });
     expect(state.entries).toEqual([]);
+  });
+});
+
+describe('offline is not failure', () => {
+  /**
+   * The bug this pins: backoff burned all six attempts in about a minute, so a
+   * capture taken on a plane gave up long before landing and then needed a
+   * manual tap. The exit criterion is that it uploads on reconnect, by itself.
+   */
+  it('never gives up while merely offline', () => {
+    let state = withCapture(EMPTY_QUEUE, 'a');
+    let now = T0;
+
+    // Twenty minutes of no connectivity — far past MAX_ATTEMPTS.
+    for (let i = 0; i < 200; i += 1) {
+      state = markFailure(state, 'a', {
+        now,
+        error: "You're offline.",
+        retryable: true,
+        offline: true,
+      });
+      now += 6_000;
+    }
+
+    expect(state.entries[0]?.status).toBe('pending');
+    expect(state.entries[0]?.attempts).toBe(0);
+    expect(nextRunnable(state, now)?.id).toBe('a');
+  });
+
+  it('re-checks soon after connectivity returns, not after a long backoff', () => {
+    let state = withCapture(EMPTY_QUEUE, 'a');
+    state = markFailure(state, 'a', {
+      now: T0,
+      error: 'offline',
+      retryable: true,
+      offline: true,
+    });
+
+    expect(nextRunnable(state, T0 + OFFLINE_RETRY_MS)?.id).toBe('a');
+  });
+
+  it('still gives up on a server that keeps rejecting the request', () => {
+    // Offline must not become a blanket excuse: a genuine server failure still
+    // exhausts its attempts.
+    let state = withCapture(EMPTY_QUEUE, 'a');
+    for (let i = 0; i < MAX_ATTEMPTS; i += 1) {
+      state = markFailure(state, 'a', { now: T0, error: 'server error', retryable: true });
+    }
+    expect(state.entries[0]?.status).toBe('failed');
+  });
+
+  it('keeps the photo when offline attempts are interleaved with real failures', () => {
+    let state = withCapture(EMPTY_QUEUE, 'a');
+    state = markFailure(state, 'a', { now: T0, error: 'server', retryable: true });
+    state = markFailure(state, 'a', { now: T0, error: 'offline', retryable: true, offline: true });
+
+    // The offline round did not advance the count.
+    expect(state.entries[0]?.attempts).toBe(1);
+    expect(state.entries[0]?.status).toBe('pending');
+  });
+});
+
+describe('paths survive an app update', () => {
+  /**
+   * iOS changes the data-container UUID on reinstall. An absolute path stored
+   * before an update points at nothing afterwards, and the queue concludes the
+   * photograph was deleted — while it sits in the new container untouched.
+   * That is how a capture gets orphaned across an app update (REL-2).
+   */
+  it('repairs an absolute URI written by an older build', () => {
+    const stale: QueueState = {
+      entries: [
+        {
+          id: 'a',
+          fileName:
+            'file:///var/mobile/Containers/Data/Application/OLD-UUID/Documents/captures/a.jpg',
+          source: 'camera',
+          status: 'pending',
+          attempts: 0,
+          uploadKey: null,
+          idempotencyKey: 'capture-a',
+          garmentId: null,
+          createdAt: T0,
+          nextAttemptAt: T0,
+          lastError: null,
+        },
+      ],
+    };
+
+    expect(rehydrate(stale, T0).entries[0]?.fileName).toBe('a.jpg');
+  });
+
+  it('leaves a relative name alone', () => {
+    const state = rehydrate(withCapture(EMPTY_QUEUE, 'a'), T0);
+    expect(state.entries[0]?.fileName).toBe('a.jpg');
+  });
+});
+
+describe('basename', () => {
+  it('takes the last path segment', () => {
+    expect(basename('file:///a/b/c.jpg')).toBe('c.jpg');
+    expect(basename('c.jpg')).toBe('c.jpg');
+  });
+
+  it('drops a query string', () => {
+    expect(basename('file:///a/c.jpg?v=2')).toBe('c.jpg');
+  });
+
+  it('returns the input rather than an empty name', () => {
+    expect(basename('')).toBe('');
   });
 });

@@ -1026,6 +1026,12 @@ components:
         id: { type: string, format: uuid }
         kind: { $ref: '#/components/schemas/ImageKind' }
         url: { type: string, format: uri }
+        # 400px WebP, for the closet grid. Null until image.process has run, or
+        # if derivative generation failed — clients fall back to `url` rather
+        # than showing nothing (docs/06-ai/image-processing.md §8).
+        thumb_url: { type: string, format: uri, nullable: true }
+        # 1080px WebP, for garment and look detail.
+        medium_url: { type: string, format: uri, nullable: true }
         url_expires_at: { type: string, format: date-time }
         width: { type: integer, nullable: true }
         height: { type: integer, nullable: true }

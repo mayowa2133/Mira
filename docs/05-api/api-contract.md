@@ -85,6 +85,39 @@ called by **every** ingestion path before writing (CAP-5).
 
 ---
 
+## Images
+
+Every garment image is returned in one shape:
+
+```json
+{
+  "id": "…",
+  "kind": "original",
+  "url": "…",            // full-size, always present
+  "thumb_url": "…",      // 400px WebP, or null
+  "medium_url": "…",     // 1080px WebP, or null
+  "url_expires_at": "…",
+  "width": 1200, "height": 1600,
+  "blurhash": "…",
+  "is_canonical": true,
+  "position": 0
+}
+```
+
+`thumb_url` and `medium_url` are null until `image.process` has run, and stay
+null if derivative generation failed — a derivative failure must never cost the
+user their garment (`docs/06-ai/image-processing.md` §8). **Clients fall back to
+`url`**, they do not hide the image.
+
+Use `thumb_url` in the closet grid and `medium_url` on detail. The original is
+kept for re-analysis, try-on and export, not for display: it is roughly an order
+of magnitude larger than the grid can use.
+
+Every variant carries its own signature, bound to the requesting user. A
+derivative is exactly as private as the photograph it came from (SEC-4).
+
+---
+
 ## Media
 
 ```text

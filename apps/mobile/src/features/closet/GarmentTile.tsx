@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { color, layout, radius, space, type } from '@mira/ui';
-import type { Garment } from './queries';
+import { imageSrc, type Garment } from './queries';
 
 /**
  * Garment tile (`docs/02-design/design-system.md` §6, Reference 01).
@@ -46,6 +46,7 @@ function GarmentTileComponent({ garment, onPress, onToggleFavorite }: GarmentTil
   const brand = garment.brand?.name ?? garment.brand_raw;
   const subtitle = formatSubtitle(garment);
   const isAnalyzing = garment.analysis_state === 'analyzing';
+  const tileImage = imageSrc(garment.canonical_image, 'thumb');
 
   // A single accessible label per tile: a screen reader should hear the
   // garment, not four disconnected fragments (docs/02-design/accessibility.md §4).
@@ -92,12 +93,15 @@ function GarmentTileComponent({ garment, onPress, onToggleFavorite }: GarmentTil
       onAccessibilityAction={handleAccessibilityAction}
     >
       <View style={styles.imageWrap}>
-        {garment.canonical_image ? (
+        {tileImage ? (
           <Image
             style={styles.image}
-            source={{ uri: garment.canonical_image.url }}
+            // The 400px derivative: a tile is ~169pt wide, so loading the
+            // full-size original here was pulling roughly ten times the bytes
+            // the screen can use, 228 times over.
+            source={{ uri: tileImage }}
             placeholder={
-              garment.canonical_image.blurhash
+              garment.canonical_image?.blurhash
                 ? { blurhash: garment.canonical_image.blurhash }
                 : undefined
             }
@@ -156,6 +160,7 @@ export const GarmentTile = memo(
     a.garment.id === b.garment.id &&
     a.garment.favorite === b.garment.favorite &&
     a.garment.canonical_image?.url === b.garment.canonical_image?.url &&
+    a.garment.canonical_image?.thumb_url === b.garment.canonical_image?.thumb_url &&
     a.garment.name === b.garment.name &&
     a.garment.analysis_state === b.garment.analysis_state,
 );

@@ -28,7 +28,24 @@ let available = false;
 let userId = '';
 let closetId = '';
 
-const logger = { info: () => undefined, warn: () => undefined, error: () => undefined };
+/**
+ * Records instead of discarding.
+ *
+ * A silent logger cost real time once: a test failed with "1 row, expected 2"
+ * and the reason — the error the runner had caught and logged — was thrown
+ * away. Assertions below surface these lines so a failure explains itself.
+ */
+const logged: string[] = [];
+const logger = {
+  info: () => undefined,
+  warn: (msg: string, fields?: Record<string, unknown>) =>
+    logged.push(`warn: ${msg} ${JSON.stringify(fields ?? {})}`),
+  error: (msg: string, fields?: Record<string, unknown>) =>
+    logged.push(`error: ${msg} ${JSON.stringify(fields ?? {})}`),
+};
+
+/** What the runner reported during this test, for failure messages. */
+const whatHappened = () => (logged.length ? logged.join('\n') : '(the runner logged nothing)');
 
 function portsWith(overrides: Partial<ImageProcessPorts> = {}): ImageProcessPorts {
   return {
@@ -162,6 +179,7 @@ afterAll(async () => {
  * that: identical code failed eight tests on one run and none on the next.
  */
 beforeEach(async () => {
+  logged.length = 0;
   if (!available || !pool) return;
   // Cascades to garment_images; jobs are removed explicitly because they
   // reference the image rather than the garment.
@@ -201,7 +219,7 @@ describe('processOneJob', () => {
     const job = await pool!.query('select status, finished_at from ingestion_jobs where id = $1', [
       jobId,
     ]);
-    expect(job.rows[0].status).toBe('complete');
+    expect(job.rows[0].status, whatHappened()).toBe('complete');
     expect(job.rows[0].finished_at).not.toBeNull();
   });
 
@@ -211,6 +229,49 @@ describe('processOneJob', () => {
 
     expect(await storage!.exists(derivedKey(key, 'thumb', 'webp'))).toBe(true);
     expect(await storage!.exists(derivedKey(key, 'medium', 'webp'))).toBe(true);
+  });
+
+  dbIt('records the derivative keys, not just the files', async () => {
+    // The files existed before this and were unreachable: nothing recorded
+    // where they were, so every closet tile loaded the full-size original.
+    const { imageId, key } = await seedCapture();
+    await processOneJob({ pool: pool!, ports: portsWith(), logger, onlyUserId: userId });
+
+    const { rows } = await pool!.query<{ thumb_key: string; medium_key: string }>(
+      'select thumb_key, medium_key from garment_images where id = $1',
+      [imageId],
+    );
+    expect(rows[0]!.thumb_key).toBe(derivedKey(key, 'thumb', 'webp'));
+    expect(rows[0]!.medium_key).toBe(derivedKey(key, 'medium', 'webp'));
+  });
+
+  dbIt('leaves the variant keys null when derivatives fail', async () => {
+    // §8: a derivative failure must not cost the user their garment. The row
+    // stays valid and the original serves.
+    const { imageId, jobId } = await seedCapture();
+
+    await processOneJob({
+      pool: pool!,
+      ports: portsWith({
+        write: async () => {
+          throw new Error('disk full');
+        },
+      }),
+      logger,
+      onlyUserId: userId,
+    });
+
+    const { rows } = await pool!.query(
+      'select thumb_key, medium_key, blurhash from garment_images where id = $1',
+      [imageId],
+    );
+    expect(rows[0].thumb_key).toBeNull();
+    expect(rows[0].medium_key).toBeNull();
+    // The rest of the work still landed.
+    expect(rows[0].blurhash).toBeTruthy();
+
+    const job = await pool!.query('select status from ingestion_jobs where id = $1', [jobId]);
+    expect(job.rows[0].status).toBe('complete');
   });
 
   dbIt('gives each capture its own derivatives', async () => {
@@ -247,7 +308,7 @@ describe('processOneJob', () => {
       [garmentId],
     );
 
-    expect(images.rows).toHaveLength(2);
+    expect(images.rows, whatHappened()).toHaveLength(2);
     const cleaned = images.rows.find((r) => r.kind === 'cleaned');
     const original = images.rows.find((r) => r.kind === 'original');
     expect(cleaned?.is_canonical).toBe(true);
