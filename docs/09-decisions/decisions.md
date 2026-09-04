@@ -541,9 +541,23 @@ Format:
   files, Fastify and the worker process.
 - **Consequences:** Clerk is cheap to adopt because `IdentityProvider`
   (D-030) already isolates the provider and verification is already JWKS-based
-  — roughly two days, and nothing else notices. Note that Clerk is *not* cheaper
-  than Supabase Auth at Mira's likely scale; it is chosen, if it is, for its
-  flows and DX.
+  — roughly two days, and nothing else notices.
+
+  **Corrected 2026-09-04:** an earlier version of this entry said Clerk was not
+  cheaper than Supabase Auth. That was wrong, and based on out-of-date figures.
+  Clerk's Hobby tier is **50,000 monthly retained users free, per app, with
+  unlimited apps**; Supabase includes 50,000 MAU on Free and 100,000 on Pro.
+  For Mira, Clerk is free well past the point where any of this matters, and
+  the choice costs nothing.
+
+  **Also corrected: the multi-project argument was not considered.** Supabase
+  Free allows 2 active projects; Pro is $25/month plus about $10/month per
+  additional running project. Convex allows 40 deployments per team on its free
+  tier. For someone running several products at once that is a genuine
+  structural difference, and it is the strongest argument for Convex that has
+  been made — stronger than the per-app cost argument this entry was originally
+  written to answer. It does not change the finding below, because it is an
+  argument about a portfolio and the findings are about this codebase.
 
   If cost is the real concern, the lever is object storage: originals plus
   derivatives with egress. Cloudflare R2's zero egress is the change that shows
