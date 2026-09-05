@@ -402,7 +402,10 @@ describe('auto-import (F-05, task 8.8)', () => {
       'select id from users where auth_provider_id = $1',
       [ALICE],
     );
-    const scope = { userId: user.rows[0]!.id };
+    // `UserScope` is branded, so it cannot be built by hand — which is the
+    // point: a plain object cannot be smuggled into a repository call.
+    const { userScope } = await import('../../db/scope.js');
+    const scope = userScope(user.rows[0]!.id);
 
     const imported = await service.autoImport(scope, [id]);
     expect(imported).toHaveLength(1);
