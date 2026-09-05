@@ -64,6 +64,26 @@ garment's own taxonomy colour, on the `surfaceSunken` ground, at 640x800 (the
 deterministic — the same seed produces the same closet, which is what makes
 screenshots and performance numbers comparable between runs.
 
+They are shaded rather than flat-filled, because a flat fill reads as a
+placeholder no matter how good the outline is. Three layers, plus a shadow:
+
+- **Form.** Darker toward the silhouette edge, driven by a distance transform
+  of the shape. This is the one that makes cloth look like cloth.
+- **Key light.** One soft source from the top left, so the garment has a
+  direction.
+- **Folds.** Low-frequency variation across the surface, 3% — the difference
+  between fabric and vinyl.
+- **Contact shadow** on the ground beneath, offset downward, so a flat lay sits
+  on a surface instead of floating over one.
+
+Each garment is also rendered with a small rotation and scale, derived from a
+caller-supplied integer rather than from a random source. Two hundred identical
+renders read as a print pattern: the eye finds the repeat immediately and the
+grid stops looking like a wardrobe. The variation is deliberately small —
+±3° and ±4.5% — because a clipped sleeve is a worse placeholder than an
+unvaried one, and a test renders forty variants to assert none of them touch
+the frame edge.
+
 There is no image dependency. PNG is written directly (zlib ships with Node) and
 blurhash is a small, well-defined transform. A raster library to draw a dozen
 rectangles would not have earned its place.

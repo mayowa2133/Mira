@@ -153,6 +153,127 @@ describe('garment rendering', () => {
   });
 });
 
+describe('shading', () => {
+  const sample = (px: Buffer, w: number, x: number, y: number) => {
+    const i = (y * w + x) * 3;
+    return ((px[i] as number) + (px[i + 1] as number) + (px[i + 2] as number)) / 3;
+  };
+
+  it('is darker at the garment edge than at its centre, so cloth has volume', () => {
+    const w = 200;
+    const h = 250;
+    const { pixels } = renderGarmentImage({
+      category: 'dresses',
+      colorHex: '#4A5C6A',
+      width: w,
+      height: h,
+    });
+    // Mid-skirt: deep inside the silhouette, and a few pixels in from its edge.
+    const row = Math.round(h * 0.72);
+    const centre = sample(pixels, w, Math.round(w * 0.5), row);
+    let leftEdge = 0;
+    for (let x = 0; x < w; x += 1) {
+      const v = sample(pixels, w, x, row);
+      // First pixel that is clearly garment rather than ground.
+      if (Math.abs(v - (GROUND.r + GROUND.g + GROUND.b) / 3) > 30) {
+        leftEdge = sample(pixels, w, Math.min(x + 2, w - 1), row);
+        break;
+      }
+    }
+    expect(leftEdge).toBeGreaterThan(0);
+    expect(centre).toBeGreaterThan(leftEdge);
+  });
+
+  it('casts a contact shadow, so the garment sits on the ground rather than over it', () => {
+    const w = 200;
+    const h = 250;
+    const { pixels } = renderGarmentImage({
+      category: 'bottoms',
+      colorHex: '#1E2A45',
+      width: w,
+      height: h,
+    });
+    const groundFarAway = sample(pixels, w, 3, 3);
+    // Just below the hem, where a shadow falls.
+    let lowest = 0;
+    for (let y = h - 1; y >= 0; y -= 1) {
+      const v = sample(pixels, w, Math.round(w * 0.5), y);
+      if (Math.abs(v - (GROUND.r + GROUND.g + GROUND.b) / 3) > 30) {
+        lowest = y;
+        break;
+      }
+    }
+    const justBelow = sample(pixels, w, Math.round(w * 0.5), Math.min(lowest + 4, h - 1));
+    expect(justBelow).toBeLessThan(groundFarAway);
+  });
+
+  it('keeps the far corner exactly the ground colour, shadow or not', () => {
+    // The shadow is offset downward and short-range; if it ever reached the
+    // corner, every tile would sit on a grey wash instead of on the ground.
+    const { pixels } = renderGarmentImage({
+      category: 'outerwear',
+      colorHex: '#000000',
+      width: 160,
+      height: 200,
+    });
+    expect([pixels[0], pixels[1], pixels[2]]).toEqual([GROUND.r, GROUND.g, GROUND.b]);
+  });
+});
+
+describe('per-garment variation', () => {
+  it('varies the render, so a closet is not a print pattern', () => {
+    const a = renderGarmentImage({ category: 'tops', colorHex: '#C0392B', width: 64, height: 80 });
+    const b = renderGarmentImage({
+      category: 'tops',
+      colorHex: '#C0392B',
+      width: 64,
+      height: 80,
+      variant: 7,
+    });
+    expect(a.pixels.equals(b.pixels)).toBe(false);
+  });
+
+  it('stays deterministic for a given variant', () => {
+    const one = renderGarmentImage({
+      category: 'tops',
+      colorHex: '#C0392B',
+      width: 64,
+      height: 80,
+      variant: 7,
+    });
+    const two = renderGarmentImage({
+      category: 'tops',
+      colorHex: '#C0392B',
+      width: 64,
+      height: 80,
+      variant: 7,
+    });
+    expect(one.pixels.equals(two.pixels)).toBe(true);
+  });
+
+  it('never rotates or scales a garment out of the frame', () => {
+    // The variation is small on purpose. A clipped sleeve is a worse
+    // placeholder than an unvaried one.
+    for (let variant = 0; variant < 40; variant += 1) {
+      const w = 120;
+      const h = 150;
+      const { pixels } = renderGarmentImage({
+        category: 'outerwear',
+        colorHex: '#000000',
+        width: w,
+        height: h,
+        variant,
+      });
+      for (let y = 0; y < h; y += 1) {
+        for (const x of [0, w - 1]) {
+          const i = (y * w + x) * 3;
+          expect(pixels[i], `variant ${variant} touches the frame edge`).toBeGreaterThan(200);
+        }
+      }
+    }
+  });
+});
+
 describe('blurhash', () => {
   const { pixels, width, height } = renderGarmentImage({
     category: 'dresses',

@@ -117,6 +117,27 @@ const NAME_PARTS: Record<string, string[]> = {
   sets: ['Matching', 'Knit', 'Tailored', 'Linen'],
 };
 
+/**
+ * The noun to use when a garment's subcategory is the catch-all.
+ *
+ * Most categories carry an `other` subcategory, and using it as the product
+ * noun produced names like "Silk Other" — on the tile, in the closet, on the
+ * first screen of every demo. A taxonomy bucket is not a word for a piece of
+ * clothing.
+ */
+const FALLBACK_NOUN: Record<string, string> = {
+  tops: 'Top',
+  bottoms: 'Trousers',
+  dresses: 'Dress',
+  outerwear: 'Jacket',
+  shoes: 'Shoes',
+  bags: 'Bag',
+  accessories: 'Accessory',
+  activewear: 'Set',
+  sets: 'Set',
+  swimwear: 'Swimsuit',
+};
+
 export type SeedGarment = {
   name: string;
   brandRaw: string | null;
@@ -182,7 +203,11 @@ export function buildRealisticCloset(seed = 20260903): SeedGarment[] {
       const price = hasPrice ? Math.round((15 + random() * 240) * 100) / 100 : null;
 
       garments.push({
-        name: `${pick(random, parts)} ${(subcategory ?? category).replace(/_/g, ' ')}`
+        name: `${pick(random, parts)} ${
+          subcategory && subcategory !== 'other'
+            ? subcategory.replace(/_/g, ' ')
+            : (FALLBACK_NOUN[category] ?? 'Piece')
+        }`
           .replace(/\b\w/g, (c) => c.toUpperCase())
           .slice(0, 60),
         brandRaw: useUnmatchedBrand ? pick(random, UNMATCHED_BRANDS) : pick(random, BRANDS),
@@ -257,11 +282,21 @@ export function buildRealisticCloset(seed = 20260903): SeedGarment[] {
 
   // 4 near-duplicate pairs: same brand and colour, different cut. These are the
   // hard cases for duplicate detection precision.
+  //
+  // The cut is changed by swapping the DESCRIPTOR — "Boxy Tank" beside "Ribbed
+  // Tank" — rather than by appending a word. Appending produced "Slip Midi
+  // Dress" beside "Slip Midi Dress Crew", which is not a different cut; it is
+  // the same garment with a typo, and since these are inserted last they sort
+  // to the top of the closet and were the first thing any demo showed.
   for (let i = 0; i < 4; i += 1) {
     const original = at(i * 41 + 4);
+    const parts = NAME_PARTS[original.category] ?? ['Classic'];
+    const [, ...noun] = original.name.split(' ');
+    const descriptor =
+      parts.find((part) => !original.name.startsWith(part)) ?? (parts[0] as string);
     garments.push({
       ...original,
-      name: `${original.name} Crew`,
+      name: `${descriptor} ${noun.join(' ')}`.slice(0, 60),
       wornCount: Math.floor(random() * 5),
       favorite: false,
     });

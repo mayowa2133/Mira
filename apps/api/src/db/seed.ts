@@ -246,7 +246,10 @@ async function insertGarments(
 
       // Synthetic imagery, so the closet grid can be judged on the thing it
       // exists to show (`docs/04-data/seed-data.md` — Images).
-      await attachSeedImage(pool, storage, userId, garmentId, item);
+      // `inserted` is the variation seed: stable for a given seed set, so the
+      // closet is identical between runs (`seed-data.md` — determinism) while
+      // no two garments render as the same stamp.
+      await attachSeedImage(pool, storage, userId, garmentId, item, inserted);
       inserted += 1;
     }
   }
@@ -267,11 +270,13 @@ async function attachSeedImage(
   userId: string,
   garmentId: string,
   item: SeedGarment,
+  variant: number,
 ): Promise<void> {
   const swatch = COLOR_SWATCHES[item.primaryColor as Color] ?? '#9A9691';
   const { png, width, height, pixels } = renderGarmentImage({
     category: item.category,
     colorHex: swatch,
+    variant,
   });
 
   const storageKey = buildStorageKey('garments', userId, garmentId, 'canonical.png');

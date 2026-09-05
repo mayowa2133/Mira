@@ -93,15 +93,35 @@ const taper = (y: number, y0: number, y1: number, w0: number, w1: number) => {
   return w0 + (w1 - w0) * t;
 };
 
+/**
+ * A scooped neckline, carved out of whatever body shape asks for it.
+ *
+ * An elliptical dip below the shoulder line rather than the square notch these
+ * shapes used to cut. At tile size a square notch is the single detail that
+ * says "drawn": real necklines are the one part of a flat-laid garment with no
+ * straight lines in it at all.
+ */
+const necklineCutsAway = (cx: number, y: number, shoulder: number, rx: number, ry: number) => {
+  if (cx >= rx) return false;
+  return y < shoulder + ry * Math.sqrt(1 - (cx / rx) * (cx / rx));
+};
+
 const top: Silhouette = (x, y) => {
   const cx = Math.abs(x - 0.5);
-  if (between(y, 0.3, 0.42) && cx <= 0.38) return true; // shoulders and sleeves
-  if (between(y, 0.3, 0.78) && cx <= 0.22) {
-    // Neckline notch.
-    if (y < 0.35 && cx < 0.09) return false;
-    return true;
-  }
-  return false;
+  const SHOULDER = 0.3;
+  const HEM = 0.74;
+  if (!between(y, SHOULDER, HEM)) return false;
+
+  // The body widens very slightly toward the hem. A perfectly parallel body
+  // reads as a box; a strong taper reads as a dress.
+  const bodyHalf = taper(y, SHOULDER, HEM, 0.215, 0.245);
+  if (cx <= bodyHalf) return !necklineCutsAway(cx, y, SHOULDER, 0.1, 0.05);
+
+  // Sleeves: set in at the armhole, tapering and angled slightly downward, so
+  // the outline is four converging lines rather than a rectangle stuck on.
+  const sleeveTop = taper(cx, 0.215, 0.4, SHOULDER + 0.005, SHOULDER + 0.055);
+  const sleeveBottom = taper(cx, 0.215, 0.4, 0.475, 0.415);
+  return cx <= 0.4 && between(y, sleeveTop, sleeveBottom);
 };
 
 const bottom: Silhouette = (x, y) => {
@@ -114,44 +134,68 @@ const bottom: Silhouette = (x, y) => {
 };
 
 const dress: Silhouette = (x, y) => {
-  if (!between(y, 0.28, 0.88)) return false;
   const cx = Math.abs(x - 0.5);
-  if (y < 0.34 && cx < 0.08) return false; // neckline
-  return cx <= taper(y, 0.28, 0.88, 0.17, 0.3);
+  const TOP = 0.28;
+  const WAIST = 0.46;
+  const HEM = 0.9;
+  if (!between(y, TOP, HEM)) return false;
+
+  // A waist. Without it this is a trapezoid, which is what it was — and a
+  // trapezoid is the shape of a lampshade, not of a dress.
+  const half =
+    y < WAIST ? taper(y, TOP, WAIST, 0.175, 0.145) : taper(y, WAIST, HEM, 0.145, 0.305);
+  if (cx > half) return false;
+  return !necklineCutsAway(cx, y, TOP, 0.105, 0.055);
 };
 
 const outerwear: Silhouette = (x, y) => {
   const cx = Math.abs(x - 0.5);
-  // Sleeves, wide and short.
-  if (between(y, 0.26, 0.46) && cx <= 0.42) return true;
-  if (!between(y, 0.26, 0.86)) return false;
-  // A wide body — narrower than this and the centre opening reads as trouser
-  // legs rather than a coat.
-  if (cx > 0.3) return false;
-  if (y < 0.32 && cx < 0.1) return false; // collar
-  // No centre opening: at thumbnail size a vertical gap reads as trouser legs,
-  // which is the one thing this silhouette must not look like.
-  return true;
+  const SHOULDER = 0.27;
+  const HEM = 0.86;
+  if (!between(y, SHOULDER, HEM)) return false;
+
+  const bodyHalf = taper(y, SHOULDER, HEM, 0.245, 0.275);
+  if (cx <= bodyHalf) {
+    // A wider, shallower opening than a tee's — a collar rather than a crew
+    // neck. No centre opening: at thumbnail size a vertical gap reads as
+    // trouser legs, which is the one thing this silhouette must not look like.
+    return !necklineCutsAway(cx, y, SHOULDER, 0.12, 0.05);
+  }
+
+  // Longer, heavier sleeves than a tee's, and set lower.
+  const sleeveTop = taper(cx, 0.245, 0.425, SHOULDER + 0.005, SHOULDER + 0.07);
+  const sleeveBottom = taper(cx, 0.245, 0.425, 0.6, 0.5);
+  return cx <= 0.425 && between(y, sleeveTop, sleeveBottom);
 };
 
 const shoe: Silhouette = (x, y) => {
-  // Side profile: a sole, a heel counter that curves forward, and a low vamp
-  // tapering to the toe.
-  if (between(y, 0.6, 0.655) && between(x, 0.2, 0.8)) return true; // sole
-  if (!between(y, 0.44, 0.6)) return false;
+  // Side profile. The shape that makes a shoe readable is the TOP line, and it
+  // is not a ramp: it is high at the heel, dips at the instep, runs flat across
+  // the toe box and rounds down at the toe. Drawn as a ramp — which is what
+  // this was — it reads as a doorstop at every size.
+  const BACK = 0.18;
+  const TOE = 0.86;
+  const SOLE_BOTTOM = 0.658;
+  if (!between(x, BACK, TOE) || y > SOLE_BOTTOM) return false;
 
-  // Heel counter, rounded at the back.
-  if (between(x, 0.2, 0.38)) {
-    const dx = (x - 0.38) / 0.18;
-    const dy = (y - 0.6) / 0.16;
-    return x >= 0.28 || dx * dx + dy * dy <= 1;
+  const t = (x - BACK) / (TOE - BACK);
+  const topEdge =
+    t < 0.28
+      ? taper(t, 0, 0.28, 0.445, 0.468) // heel counter
+      : t < 0.52
+        ? taper(t, 0.28, 0.52, 0.468, 0.537) // instep
+        : t < 0.8
+          ? taper(t, 0.52, 0.8, 0.537, 0.549) // toe box
+          : taper(t, 0.8, 1, 0.549, 0.632); // toe, rounding into the sole
+  if (y < topEdge) return false;
+
+  // Round the top-back corner, so the heel is a counter rather than a cut edge.
+  if (t < 0.12) {
+    const dx = (0.12 - t) / 0.12;
+    const dy = (topEdge + 0.06 - y) / 0.06;
+    if (dy > 0 && dx * dx + dy * dy > 1) return false;
   }
-  // Vamp: height falls away toward the toe.
-  if (between(x, 0.38, 0.78)) {
-    const topEdge = taper(x, 0.38, 0.78, 0.47, 0.565);
-    return y >= topEdge;
-  }
-  return false;
+  return true;
 };
 
 const bag: Silhouette = (x, y) => {
@@ -219,17 +263,22 @@ export function hexToRgb(hex: string): Rgb {
 const GROUND: Rgb = { r: 0xf5, g: 0xf3, b: 0xf0 };
 
 const clamp255 = (v: number) => (v < 0 ? 0 : v > 255 ? 255 : Math.round(v));
+const mix = (a: number, b: number, t: number) => a + (b - a) * t;
+const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+/** Hermite ease, so shading bands have no visible seam. */
+const smoothstep = (t: number) => t * t * (3 - 2 * t);
 
 /**
  * Where the silhouettes actually sit in their own coordinate space.
  *
- * Every shape below is authored between these bounds, which leaves a quarter of
+ * Every shape above is authored between these bounds, which leaves a quarter of
  * the frame empty above the garment and none below it. Rendered straight, a
  * closet of them reads as a grid of small objects floating high in grey boxes —
  * the opposite of the fashion-first hierarchy the tiles are built for.
  */
 const GARMENT_TOP = 0.26;
 const GARMENT_BOTTOM = 0.9;
+const GARMENT_CENTRE = (GARMENT_TOP + GARMENT_BOTTOM) / 2;
 
 /**
  * Recentre the garment in the frame, and zoom slightly.
@@ -239,28 +288,106 @@ const GARMENT_BOTTOM = 0.9;
  * and a cropped garment is a worse placeholder than a small one.
  */
 const FRAME_ZOOM = 1.09;
-const GARMENT_CENTRE = (GARMENT_TOP + GARMENT_BOTTOM) / 2;
 
-function framed(nx: number, ny: number): { x: number; y: number } {
+/**
+ * Per-garment variation.
+ *
+ * Two hundred identical renders read as a print pattern rather than as a
+ * wardrobe: the eye picks up the repeat instantly, and the grid stops looking
+ * like a closet. A small rotation and scale per garment breaks the repeat
+ * without making any single tile look wrong.
+ *
+ * Derived from a caller-supplied integer rather than from `Math.random`,
+ * because `seed-data.md` buys determinism deliberately — the same seed must
+ * produce the same closet, or screenshots and performance numbers stop being
+ * comparable between runs.
+ */
+type Variation = { angle: number; scale: number; phase: number };
+
+function variationFor(variant: number): Variation {
+  if (variant === 0) return { angle: 0, scale: 1, phase: 0 };
+  // Three different irrationals, so the three properties do not move together
+  // and produce a visible pattern of their own.
+  const a = (variant * 0.6180339887) % 1;
+  const b = (variant * 0.7548776662) % 1;
+  const c = (variant * 0.3247179572) % 1;
   return {
-    x: 0.5 + (nx - 0.5) / FRAME_ZOOM,
-    y: GARMENT_CENTRE + (ny - 0.5) / FRAME_ZOOM,
+    angle: (a - 0.5) * 0.10, // ±2.9°
+    scale: 1 + (b - 0.5) * 0.09, // ±4.5%
+    phase: c * Math.PI * 2,
   };
 }
-const mix = (a: number, b: number, t: number) => a + (b - a) * t;
+
+/**
+ * Distance, in pixels, from every set pixel to the nearest unset one.
+ *
+ * A two-pass chamfer transform: exact enough for shading and O(width × height),
+ * where sampling the silhouette in a ring around every pixel would be an order
+ * of magnitude slower for a result no eye could tell apart.
+ */
+function distanceToEdge(mask: Uint8Array, width: number, height: number): Float32Array {
+  const INF = 1e9;
+  const d = new Float32Array(width * height);
+  for (let i = 0; i < d.length; i += 1) d[i] = mask[i] ? INF : 0;
+
+  const D1 = 1;
+  const D2 = Math.SQRT2;
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const i = y * width + x;
+      if (d[i] === 0) continue;
+      let best = d[i] as number;
+      if (x > 0) best = Math.min(best, (d[i - 1] as number) + D1);
+      if (y > 0) best = Math.min(best, (d[i - width] as number) + D1);
+      if (x > 0 && y > 0) best = Math.min(best, (d[i - width - 1] as number) + D2);
+      if (x < width - 1 && y > 0) best = Math.min(best, (d[i - width + 1] as number) + D2);
+      d[i] = best;
+    }
+  }
+  for (let y = height - 1; y >= 0; y -= 1) {
+    for (let x = width - 1; x >= 0; x -= 1) {
+      const i = y * width + x;
+      if (d[i] === 0) continue;
+      let best = d[i] as number;
+      if (x < width - 1) best = Math.min(best, (d[i + 1] as number) + D1);
+      if (y < height - 1) best = Math.min(best, (d[i + width] as number) + D1);
+      if (x < width - 1 && y < height - 1) best = Math.min(best, (d[i + width + 1] as number) + D2);
+      if (x > 0 && y < height - 1) best = Math.min(best, (d[i + width - 1] as number) + D2);
+      d[i] = best;
+    }
+  }
+  return d;
+}
 
 /**
  * Render a flat-lay placeholder.
  *
- * Supersampled 2x so silhouette edges are smooth rather than jagged, with a
- * soft vertical shade across the garment so tiles read as objects rather than
- * flat blocks.
+ * The shading is what separates this from a coloured cut-out, and it is three
+ * things layered:
+ *
+ *   - **Form.** Cloth over a body is darker where it turns away at the edge.
+ *     Driven by distance from the silhouette edge, which is why the distance
+ *     field above exists.
+ *   - **Key light.** One soft source from the top left, so the whole garment
+ *     has a direction.
+ *   - **Folds.** Low-frequency variation across the surface. Small — 3% — but
+ *     it is the difference between fabric and vinyl.
+ *
+ * Plus a contact shadow on the ground beneath the garment, which is what makes
+ * a flat lay sit on a surface instead of floating over one.
+ *
+ * These are still placeholders and still not photographs. They exercise layout,
+ * hierarchy and colour handling; they cannot tell you how the grid behaves with
+ * the crops, backgrounds and contrast of real garment photos.
  */
 export function renderGarmentImage(options: {
   category: string;
   colorHex: string;
   width?: number;
   height?: number;
+  /** Stable per-garment integer. 0 renders the canonical, unvaried garment. */
+  variant?: number;
 }): { png: Buffer; width: number; height: number; pixels: Buffer } {
   const width = options.width ?? 640;
   const height = options.height ?? 800;
@@ -275,8 +402,27 @@ export function renderGarmentImage(options: {
       ? { r: clamp255(base.r - 26), g: clamp255(base.g - 26), b: clamp255(base.b - 26) }
       : base;
 
-  const pixels = Buffer.alloc(width * height * 3);
-  const SS = 2; // supersample factor
+  const { angle, scale, phase } = variationFor(options.variant ?? 0);
+  const sin = Math.sin(angle);
+  const cos = Math.cos(angle);
+  const zoom = FRAME_ZOOM * scale;
+
+  const framed = (nx: number, ny: number): { x: number; y: number } => {
+    // Rotate about the frame centre first, then recentre and zoom. Rotating
+    // after the recentre would swing the garment out of frame at the bottom,
+    // where it already sits closest to the edge.
+    const dx = nx - 0.5;
+    const dy = ny - 0.5;
+    const rx = dx * cos - dy * sin;
+    const ry = dx * sin + dy * cos;
+    return { x: 0.5 + rx / zoom, y: GARMENT_CENTRE + ry / zoom };
+  };
+
+  // 3x, not 2x: the edge is now the most-looked-at part of the image, because
+  // the form shading draws the eye straight to it.
+  const SS = 3;
+  const coverage = new Float32Array(width * height);
+  const mask = new Uint8Array(width * height);
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -289,18 +435,56 @@ export function renderGarmentImage(options: {
           if (shape(p.x, p.y)) covered += 1;
         }
       }
-      const coverage = covered / (SS * SS);
+      const i = y * width + x;
+      const c = covered / (SS * SS);
+      coverage[i] = c;
+      mask[i] = c > 0.5 ? 1 : 0;
+    }
+  }
 
-      // Soft top-to-bottom shading, so the garment has a little depth.
-      const shade = 1 - 0.14 * (y / height);
-      const gr = clamp255(edge.r * shade);
-      const gg = clamp255(edge.g * shade);
-      const gb = clamp255(edge.b * shade);
+  const inside = distanceToEdge(mask, width, height);
+  const outsideMask = new Uint8Array(width * height);
+  for (let i = 0; i < mask.length; i += 1) outsideMask[i] = mask[i] ? 0 : 1;
+  const outside = distanceToEdge(outsideMask, width, height);
 
-      const i = (y * width + x) * 3;
-      pixels[i] = clamp255(mix(GROUND.r, gr, coverage));
-      pixels[i + 1] = clamp255(mix(GROUND.g, gg, coverage));
-      pixels[i + 2] = clamp255(mix(GROUND.b, gb, coverage));
+  const shortest = Math.min(width, height);
+  /** How far in from the edge the garment reaches full brightness. */
+  const formBand = 0.075 * shortest;
+  /** How far the contact shadow reaches onto the ground. */
+  const shadowBand = 0.055 * shortest;
+  /** The shadow sits below the garment, as a single overhead-ish light gives. */
+  const shadowDrop = Math.round(0.018 * height);
+
+  const pixels = Buffer.alloc(width * height * 3);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const i = y * width + x;
+      const nx = x / width;
+      const ny = y / height;
+
+      // --- the garment ---------------------------------------------------
+      const form = 0.78 + 0.22 * smoothstep(clamp01((inside[i] as number) / formBand));
+      const key = 1.07 - 0.15 * ((nx + ny) / 2);
+      const folds =
+        1 +
+        0.03 *
+          (Math.sin(nx * 13 + phase) * 0.5 +
+            Math.sin(ny * 8.5 - phase * 1.7) * 0.3 +
+            Math.sin((nx + ny) * 21 + phase * 0.6) * 0.2);
+      const shade = form * key * folds;
+
+      // --- the ground ------------------------------------------------------
+      // Sampled from above the pixel, which drops the shadow below the garment.
+      const sy = y - shadowDrop < 0 ? 0 : y - shadowDrop;
+      const shadowDistance = outside[sy * width + x] as number;
+      const shadow = (1 - smoothstep(clamp01(shadowDistance / shadowBand))) ** 2 * 0.11;
+      const ground = 1 - shadow;
+
+      const c = coverage[i] as number;
+      pixels[i * 3] = clamp255(mix(GROUND.r * ground, edge.r * shade, c));
+      pixels[i * 3 + 1] = clamp255(mix(GROUND.g * ground, edge.g * shade, c));
+      pixels[i * 3 + 2] = clamp255(mix(GROUND.b * ground, edge.b * shade, c));
     }
   }
 
