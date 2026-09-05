@@ -5,6 +5,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
+import { Icon } from '@/ui/Icon';
 import { ClosetGridSkeleton, ClosetState } from '@/features/closet/ClosetGrid';
 import { describeLoadFailure } from '@/features/closet/load-failure';
 import {
@@ -60,7 +61,7 @@ export default function PurchaseReviewScreen() {
     <View style={styles.root}>
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + space.lg }]}>
         <Pressable onPress={() => router.back()} hitSlop={space.md} accessibilityLabel="Back">
-          <Text style={styles.back}>‹</Text>
+          <Icon name="chevronLeft" size={24} color={color.text} />
         </Pressable>
         <Text style={styles.title} accessibilityRole="header">
           {headerLabel(candidates.data?.total ?? 0)}
@@ -212,7 +213,7 @@ function Tile({
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       >
-        <Text style={[styles.tickMark, selected && styles.tickMarkOn]}>✓</Text>
+        {selected ? <Icon name="check" size={18} color={color.accent} /> : null}
       </Pressable>
 
       <Text style={styles.cellLabel} numberOfLines={2}>

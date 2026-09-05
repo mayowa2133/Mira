@@ -5,6 +5,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
+import { Icon } from '@/ui/Icon';
 import { ClosetGridSkeleton, ClosetState } from '@/features/closet/ClosetGrid';
 import { describeLoadFailure } from '@/features/closet/load-failure';
 import { useWearHistory } from '@/features/wardrobe/queries';
@@ -61,7 +62,7 @@ export default function WearHistoryScreen() {
       contentContainerStyle={[styles.content, { paddingTop: insets.top + space.lg }]}
     >
       <Pressable onPress={() => router.back()} hitSlop={space.md} accessibilityLabel="Back">
-        <Text style={styles.back}>‹</Text>
+        <Icon name="chevronLeft" size={24} color={color.text} />
       </Pressable>
       <Text style={styles.title} accessibilityRole="header">
         What you wore
@@ -75,7 +76,7 @@ export default function WearHistoryScreen() {
           accessibilityLabel="Previous month"
           testID="month-back"
         >
-          <Text style={styles.step}>‹</Text>
+          <Icon name="chevronLeft" size={20} color={color.text} />
         </Pressable>
         <Text style={styles.month}>{monthLabel(year, month)}</Text>
         <Pressable
@@ -85,7 +86,7 @@ export default function WearHistoryScreen() {
           accessibilityLabel="Next month"
           testID="month-forward"
         >
-          <Text style={styles.step}>›</Text>
+          <Icon name="chevronRight" size={20} color={color.text} />
         </Pressable>
       </View>
 

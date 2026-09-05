@@ -1,5 +1,6 @@
 import { memo } from 'react';
-import Svg, { Circle, Path, type ColorValue } from 'react-native-svg';
+import { type ColorValue } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 /**
  * Mira's icons (`docs/02-design/design-system.md` §6 — Icons).
@@ -26,6 +27,8 @@ export type IconName =
   | 'filter'
   | 'plus'
   | 'chevronRight'
+  | 'chevronLeft'
+  | 'check'
   | 'search'
   | 'mail'
   | 'receipt'
@@ -125,6 +128,10 @@ function IconComponent({ name, size = 24, color, filled = false }: IconProps) {
       {name === 'plus' ? <Path d="M12 5.25v13.5M5.25 12h13.5" {...common} /> : null}
 
       {name === 'chevronRight' ? <Path d="M9.5 5.5 16 12l-6.5 6.5" {...common} /> : null}
+
+      {name === 'chevronLeft' ? <Path d="M14.5 5.5 8 12l6.5 6.5" {...common} /> : null}
+
+      {name === 'check' ? <Path d="m5 12.5 4.5 4.5L19 7" {...common} /> : null}
 
       {name === 'search' ? (
         <>

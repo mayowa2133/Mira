@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, STYLE_TAGS } from '@mira/taxonomy';
 import { color, space, type } from '@mira/ui';
+import { Icon } from '@/ui/Icon';
 import { ChipMultiSelect } from '@/ui/Fields';
 import { ClosetGridSkeleton, ClosetState } from '@/features/closet/ClosetGrid';
 import { describeLoadFailure } from '@/features/closet/load-failure';
@@ -57,7 +58,7 @@ export default function StylePreferencesScreen() {
       contentContainerStyle={[styles.content, { paddingTop: insets.top + space.lg }]}
     >
       <Pressable onPress={() => router.back()} hitSlop={space.md} accessibilityLabel="Back">
-        <Text style={styles.back}>‹</Text>
+        <Icon name="chevronLeft" size={24} color={color.text} />
       </Pressable>
       <Text style={styles.title} accessibilityRole="header">
         Style preferences

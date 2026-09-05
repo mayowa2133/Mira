@@ -122,7 +122,7 @@ export default function LookDetailScreen() {
             accessibilityRole="button"
             accessibilityLabel="Back"
           >
-            <Text style={styles.closeGlyph}>‹</Text>
+            <Icon name="chevronLeft" size={24} color={color.text} />
           </Pressable>
         </View>
 

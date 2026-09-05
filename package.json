@@ -15,7 +15,7 @@
     "generate:taxonomy": "node scripts/generate-taxonomy.mjs",
     "generate:taxonomy:check": "node scripts/generate-taxonomy.mjs --check",
     "build": "tsc -b",
-    "typecheck": "npm run generate:taxonomy && tsc -b",
+    "typecheck": "npm run generate:taxonomy && tsc -b && npm run typecheck --workspace @mira/mobile",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

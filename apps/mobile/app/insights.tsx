@@ -5,6 +5,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
+import { Icon } from '@/ui/Icon';
 import { ClosetGridSkeleton, ClosetState } from '@/features/closet/ClosetGrid';
 import { GarmentRail } from '@/features/wardrobe/GarmentRail';
 import { SimilarOwnedSection } from '@/features/wardrobe/SimilarOwnedSection';
@@ -55,7 +56,7 @@ export default function InsightsScreen() {
           accessibilityRole="button"
           accessibilityLabel="Back"
         >
-          <Text style={styles.back}>‹</Text>
+          <Icon name="chevronLeft" size={24} color={color.text} />
         </Pressable>
         <Text style={styles.title} accessibilityRole="header">
           Your closet lately
@@ -99,7 +100,7 @@ export default function InsightsScreen() {
         testID="open-wear-history"
       >
         <Text style={styles.historyLabel}>What you wore</Text>
-        <Text style={styles.historyChevron}>›</Text>
+        <Icon name="chevronRight" size={18} color={color.textTertiary} />
       </Pressable>
 
       {/* Optional, collapsed by default (§26). */}

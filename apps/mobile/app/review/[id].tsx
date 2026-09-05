@@ -5,6 +5,7 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
+import { Icon } from '@/ui/Icon';
 import { ClosetGridSkeleton, ClosetState } from '@/features/closet/ClosetGrid';
 import { imageSrc, useGarment, useGarmentAttributes } from '@/features/closet/queries';
 import { buildChips, buildReviewRows, type ReviewRow } from '@/features/closet/review-rows';
@@ -171,7 +172,9 @@ function ReviewFieldRow({ row, onPress }: { row: ReviewRow; onPress: () => void 
         {empty ? row.placeholder : row.display}
       </Text>
       {/* A tick is the only confidence signal on screen, and it means "sure". */}
-      <Text style={styles.rowTick}>{row.showTick ? '✓' : ' '}</Text>
+      <View style={styles.rowTick}>
+        {row.showTick ? <Icon name="check" size={16} color={color.success} /> : null}
+      </View>
     </Pressable>
   );
 }

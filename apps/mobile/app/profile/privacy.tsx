@@ -4,6 +4,7 @@ import { Text } from '@/ui/Text';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
+import { Icon } from '@/ui/Icon';
 import {
   DELETE_ACCOUNT_CONFIRMATION,
   PRIVACY_ACTIONS,
@@ -42,7 +43,7 @@ export default function PrivacyScreen() {
       contentContainerStyle={[styles.content, { paddingTop: insets.top + space.lg }]}
     >
       <Pressable onPress={() => router.back()} hitSlop={space.md} accessibilityLabel="Back">
-        <Text style={styles.back}>‹</Text>
+        <Icon name="chevronLeft" size={24} color={color.text} />
       </Pressable>
       <Text style={styles.title} accessibilityRole="header">
         Privacy &amp; data
