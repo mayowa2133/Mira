@@ -8,6 +8,32 @@ describe('where launch sends you', () => {
     expect(launchRoute({ isLoading: true, isSignedIn: true, state: 'completed' })).toBeNull();
   });
 
+  it('does not mistake an unreachable server for a signed-out user', () => {
+    // Signed-in is decided by asking the server, so a dropped connection looks
+    // exactly like a real sign-out. Routing on that sends a RETURNING user
+    // into the new-user welcome flow because their train went into a tunnel —
+    // and Mira is meant to work offline (the airplane-mode capture criterion
+    // says so outright).
+    expect(
+      launchRoute({ isLoading: false, isSignedIn: false, state: undefined, reachable: false }),
+    ).toBeNull();
+  });
+
+  it('still ignores cached state when the server is unreachable', () => {
+    // Staying put is not the same as trusting what we last saw: it navigates
+    // nowhere, so whatever the app already shows keeps showing.
+    expect(
+      launchRoute({ isLoading: false, isSignedIn: false, state: 'completed', reachable: false }),
+    ).toBeNull();
+  });
+
+  it('treats a reachable server the same as before', () => {
+    // The flag is opt-in: every existing caller and case is unchanged.
+    expect(
+      launchRoute({ isLoading: false, isSignedIn: false, state: undefined, reachable: true }),
+    ).toBe('/onboarding/welcome');
+  });
+
   it('sends a signed-out visitor to Welcome', () => {
     expect(launchRoute({ isLoading: false, isSignedIn: false, state: undefined })).toBe(
       '/onboarding/welcome',

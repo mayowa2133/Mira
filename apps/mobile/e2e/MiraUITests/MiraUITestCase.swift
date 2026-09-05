@@ -86,14 +86,39 @@ class MiraUITestCase: XCTestCase {
     /// `EXPO_PUBLIC_DEV_INITIAL_ROUTE` launch override — a test that only passes
     /// when an environment variable happens to be set is a test that will lie
     /// later.
+    /// Names the screen when the tab bar is missing, so the failure says which
+    /// of its two causes actually happened instead of leaving it to be guessed.
+    func onboardingHint() -> String {
+        if app.staticTexts["Your closet. Your stylist. Your mirror."].exists {
+            return "the Welcome screen — the app is signed out, not un-bundled"
+        }
+        if app.buttons["Get started"].exists {
+            return "onboarding — the app is signed out, not un-bundled"
+        }
+        if app.staticTexts.count == 0 {
+            return "nothing at all — the bundle probably never loaded"
+        }
+        return "something without a tab bar"
+    }
+
     @discardableResult
     func openCloset(file: StaticString = #filePath, line: UInt = #line) -> Bool {
         let tab = closetTab()
         guard tab.waitForExistence(timeout: Self.launchTimeout) else {
             XCTFail(
                 """
-                Closet tab never appeared within \(Self.launchTimeout)s. \
-                Is Metro running and did the bundle load?
+                Closet tab never appeared within \(Self.launchTimeout)s.
+
+                There is no tab bar on the onboarding stack, so the usual cause \
+                is NOT a dead bundler: the app launched and routed to Welcome \
+                because /v1/me did not return a signed-in user. Check that the \
+                API is up AND that it accepts EXPO_PUBLIC_DEV_AUTH_TOKEN — a \
+                401 there is indistinguishable from a real sign-out, and the \
+                app is right to show Welcome.
+
+                Second cause: Metro is not serving the bundle.
+
+                On screen now: \(onboardingHint())
 
                 \(hierarchy())
                 """,

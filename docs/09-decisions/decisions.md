@@ -680,3 +680,28 @@ Format:
   layout holds the first frame until the faces are registered — safe only
   because they are in the bundle — rather than rendering in the system face and
   reflowing.
+
+## D-037 — An unreachable server is not a signed-out user
+
+- **Date:** 2026-09-05 · **Status:** Accepted
+- **Decision:** `launchRoute` takes `reachable`. When the server could not be
+  reached at all, launch navigates NOWHERE rather than to Welcome. Only a 401 —
+  the server answering "nobody" — routes a user to the onboarding stack.
+- **Why:** signed-in is decided by asking the server who you are, so a dropped
+  connection produced exactly the same "no user" as a real sign-out. Opening
+  Mira with no network sent a returning user into the NEW-USER welcome flow —
+  "Your closet. Your stylist. Your mirror. Get started." — because their train
+  went into a tunnel. `state.ts` already carried the right reasoning two lines
+  further down, for the case where the server answers but says nothing about
+  onboarding: "showing a returning user the welcome screen is worse than showing
+  a new one a closet they can add to." That branch was simply never reached,
+  because `isSignedIn` collapsed "unreachable" into "false" before it. This is
+  the same defect as the empty-closet bug — an unloaded closet is not an empty
+  one — and it matters more here, because offline use is a Phase 2 exit
+  criterion.
+- **Consequences:** navigating nowhere leaves the app on Home, which already
+  renders a failed closet honestly via `describeLoadFailure`. It does NOT mean
+  trusting stale cached state: nothing is read and nothing is assumed, the app
+  simply does not move. Found because `verify-offline-capture.sh` could not get
+  past launch with the API down; the test blamed Metro, and the message has been
+  rewritten to name the real cause and say which screen is up.

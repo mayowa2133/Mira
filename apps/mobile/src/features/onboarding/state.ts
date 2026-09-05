@@ -25,8 +25,26 @@ export function launchRoute(input: {
   isLoading: boolean;
   isSignedIn: boolean;
   state: OnboardingState | undefined;
+  /**
+   * False when the server could not be reached at all — offline, DNS, 5xx.
+   * A 401 is NOT this: that is the server answering.
+   */
+  reachable?: boolean;
 }): string | null {
   if (input.isLoading) return null;
+
+  // An unreachable server is not a signed-out user.
+  //
+  // Signed-in is decided by asking the server who you are, so a dropped
+  // connection produces exactly the same "no user" as a real sign-out — and
+  // the app would send a returning user to the NEW-USER welcome flow because
+  // their train went into a tunnel. Mira is meant to work offline; the
+  // airplane-mode capture criterion says so outright.
+  //
+  // The same reading the `default` branch below already applies: when the
+  // server has not told us, Home is the safer guess. Showing a returning user
+  // Welcome is worse than showing a new one a closet they can add to.
+  if (input.reachable === false) return null;
 
   // Not signed in: Welcome, whatever any stale cached state says.
   if (!input.isSignedIn) return '/onboarding/welcome';

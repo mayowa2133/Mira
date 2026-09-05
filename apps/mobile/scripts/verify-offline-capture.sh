@@ -35,8 +35,17 @@ garment_count() {
 }
 
 start_api() {
+  # DEV_AUTH_SECRET is deliberately NOT set here.
+  #
+  # `createDevVerifier` already defaults it to `mira-local-dev-secret`, which is
+  # what every dev token is minted with. Hardcoding a different value started an
+  # API that rejected the app's own token with 401 — whereupon the app correctly
+  # showed the signed-out welcome screen, which has no tab bar, and the test
+  # reported "Closet tab never appeared. Is Metro running?".
+  #
+  # An exported DEV_AUTH_SECRET still propagates into the subshell on its own.
+  # MIRA_ENV=local is what selects the dev verifier; the secret does not.
   (cd "$REPO/apps/api" && \
-    DEV_AUTH_SECRET="${DEV_AUTH_SECRET:-mira-local-dev-phase2}" \
     JWT_AUDIENCE=mira MIRA_ENV=local \
     nohup node dist/index.js > /tmp/mira-api.log 2>&1 &)
   for _ in $(seq 1 20); do
@@ -47,10 +56,34 @@ start_api() {
   return 1
 }
 
+# `lsof` lives in /usr/sbin. On a PATH that omits it, the cwd lookup below
+# returns nothing, every candidate process is silently skipped, and the only
+# symptom is the confusing "API is still reachable" abort further down —
+# pointing at the API when the actual fault is this script's own toolchain.
+command -v lsof >/dev/null || {
+  echo "lsof not found on PATH (it lives in /usr/sbin) — cannot identify the API process" >&2
+  exit 1
+}
+
 stop_api() {
-  for pid in $(pgrep -f "node dist/index.js" || true); do
-    cwd=$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | grep ^n | cut -c2- || true)
-    case "$cwd" in *apps/api) kill "$pid" 2>/dev/null || true;; esac
+  # Matches BOTH `node dist/index.js` and the `node --watch dist/index.js` that
+  # `npm run api` actually starts — the command this script's own header tells
+  # you to run.
+  #
+  # Matching only the former killed the WATCHER'S CHILD, which the watcher then
+  # immediately respawned. The API stayed up, and the guard below stopped the
+  # run with "API is still reachable" — so the one scenario this script exists
+  # to verify could not be run by following its own instructions.
+  #
+  # Killed in two passes because order matters: a surviving supervisor restarts
+  # a dead child faster than the check below can notice it is gone.
+  for _ in 1 2 3; do
+    for pid in $(pgrep -f "dist/index.js" || true); do
+      cwd=$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | grep ^n | cut -c2- || true)
+      case "$cwd" in *apps/api) kill "$pid" 2>/dev/null || true;; esac
+    done
+    sleep 1
+    curl -fsS -o /dev/null --max-time 2 http://localhost:4000/v1/health || return 0
   done
   sleep 1
 }

@@ -33,10 +33,16 @@ export function useLaunchRoute(): void {
     const signedOut = me.error instanceof ApiError && me.error.status === 401;
     if (me.isLoading && !signedOut) return;
 
+    // Any other error means the server did not answer, which is not the same
+    // as answering "nobody". Without this, opening Mira offline sends a
+    // returning user into the new-user welcome flow.
+    const unreachable = Boolean(me.error) && !signedOut;
+
     const route = launchRoute({
       isLoading: false,
       isSignedIn: !signedOut && Boolean(me.data),
       state: me.data?.onboarding_state,
+      reachable: !unreachable,
     });
     if (!route) return;
 
