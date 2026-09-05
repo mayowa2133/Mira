@@ -18,7 +18,7 @@ export type ProfileRow = {
 
 export const PROFILE_ROWS: readonly ProfileRow[] = [
   { key: 'style', label: 'Style preferences', to: '/profile/style', phase: null },
-  { key: 'body', label: 'Body profile', to: null, phase: 'Phase 10' },
+  { key: 'body', label: 'Body profile', to: '/body', phase: null },
   { key: 'accounts', label: 'Connected accounts', to: null, phase: 'Phase 8' },
   // The one row that must work now: privacy.md routes deletion and export
   // through it, and deletion is built.
