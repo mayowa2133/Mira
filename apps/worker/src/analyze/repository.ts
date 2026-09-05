@@ -104,10 +104,7 @@ export async function claimNextAnalyzeJob(
  * §2: the cleaned cutout is the primary signal and the original gives context.
  * Ordering matters because a provider reads them in order.
  */
-export async function imagesFor(
-  pool: Pool,
-  job: AnalyzeJob,
-): Promise<GarmentImageRef[]> {
+export async function imagesFor(pool: Pool, job: AnalyzeJob): Promise<GarmentImageRef[]> {
   const { rows } = await pool.query<{
     storage_key: string;
     image_hash: string | null;

@@ -17,11 +17,7 @@ import type {
   TryOnCapability,
   VisionCapability,
 } from './capabilities.js';
-import {
-  OutfitProposalsSchema,
-  QueryInterpretationSchema,
-  TagReadingSchema,
-} from './contracts.js';
+import { OutfitProposalsSchema, QueryInterpretationSchema, TagReadingSchema } from './contracts.js';
 import { parseAndValidate, type Validated } from './pipeline.js';
 
 const EMBEDDING_DIMENSIONS = 1024;

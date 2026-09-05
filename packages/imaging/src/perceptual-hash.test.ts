@@ -45,7 +45,14 @@ function scene(options: {
   return { data, width, height, channels: 3 };
 }
 
-const dress = scene({ width: 200, height: 260, cx: 0.5, cy: 0.5, radius: 0.35, tint: [30, 30, 40] });
+const dress = scene({
+  width: 200,
+  height: 260,
+  cx: 0.5,
+  cy: 0.5,
+  radius: 0.35,
+  tint: [30, 30, 40],
+});
 
 describe('perceptualHash', () => {
   it('is 64 bits of hex', () => {

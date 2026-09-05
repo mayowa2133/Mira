@@ -22,7 +22,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify": "npm run typecheck && npm run lint && npm run test",
+    "verify": "npm run generate:taxonomy:check && npm run tasks:check && npm run typecheck && npm run lint && npm run format:check && npm run test",
     "mobile": "npm run start --workspace @mira/mobile",
     "api": "npm run dev --workspace @mira/api",
     "worker": "npm run dev --workspace @mira/worker",
@@ -34,7 +34,9 @@
     "evaluate": "node scripts/evaluate.mjs",
     "db:test:setup": "node scripts/setup-test-db.mjs",
     "pretest": "npm run db:test:setup",
-    "evaluate:duplicates": "node scripts/evaluate-duplicates.mjs"
+    "evaluate:duplicates": "node scripts/evaluate-duplicates.mjs",
+    "tasks": "node scripts/task-status.mjs",
+    "tasks:check": "node scripts/task-status.mjs --check"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

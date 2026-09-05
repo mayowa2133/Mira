@@ -81,7 +81,11 @@ export function downsample(image: PixelBuffer, maxEdge: number): PixelBuffer {
  * not read as black, which would put a hard edge into every hash of every
  * cutout and make two unrelated cutouts look similar.
  */
-export function toGrayscale(image: PixelBuffer): { data: Float64Array; width: number; height: number } {
+export function toGrayscale(image: PixelBuffer): {
+  data: Float64Array;
+  width: number;
+  height: number;
+} {
   assertPixelBuffer(image);
   const { width, height, channels } = image;
   const out = new Float64Array(width * height);

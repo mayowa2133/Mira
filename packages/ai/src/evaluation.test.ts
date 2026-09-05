@@ -81,7 +81,10 @@ describe('brandPrecisionWithoutTag', () => {
       testCase({ id: 'a', expected: { category: 'tops', brand: 'Ganni' } }),
       testCase({ id: 'b', expected: { category: 'tops', brand: 'Toteme' } }),
     ];
-    const predictions = [prediction({ id: 'a', brand: null }), prediction({ id: 'b', brand: null })];
+    const predictions = [
+      prediction({ id: 'a', brand: null }),
+      prediction({ id: 'b', brand: null }),
+    ];
 
     const metric = brandPrecisionWithoutTag(cases, predictions);
     expect(metric.value).toBe(1);

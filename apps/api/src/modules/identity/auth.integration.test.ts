@@ -382,13 +382,18 @@ describe('style preferences (task 11.1)', () => {
     await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(ALICE) });
 
     const res = await app!.inject({
-      method: 'GET', url: '/v1/preferences/style', headers: await auth(ALICE),
+      method: 'GET',
+      url: '/v1/preferences/style',
+      headers: await auth(ALICE),
     });
 
     expect(res.statusCode).toBe(200);
     // Absent and empty mean the same thing, so no caller has to tell them apart.
     expect(res.json()).toEqual({
-      preferred_styles: [], avoided_styles: [], preferred_colors: [], avoided_colors: [],
+      preferred_styles: [],
+      avoided_styles: [],
+      preferred_colors: [],
+      avoided_colors: [],
     });
   });
 
@@ -400,8 +405,10 @@ describe('style preferences (task 11.1)', () => {
       url: '/v1/preferences/style',
       headers: await auth(ALICE),
       payload: {
-        preferred_styles: ['minimal'], avoided_styles: [],
-        preferred_colors: ['black'], avoided_colors: ['yellow'],
+        preferred_styles: ['minimal'],
+        avoided_styles: [],
+        preferred_colors: ['black'],
+        avoided_colors: ['yellow'],
       },
     });
 
@@ -409,7 +416,9 @@ describe('style preferences (task 11.1)', () => {
     expect(res.json().preferred_styles).toEqual(['minimal']);
 
     const read = await app!.inject({
-      method: 'GET', url: '/v1/preferences/style', headers: await auth(ALICE),
+      method: 'GET',
+      url: '/v1/preferences/style',
+      headers: await auth(ALICE),
     });
     expect(read.json().avoided_colors).toEqual(['yellow']);
   });
@@ -417,20 +426,29 @@ describe('style preferences (task 11.1)', () => {
   dbIt('replaces rather than merges, because PUT means replace', async () => {
     await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(ALICE) });
     const body = (styles: string[]) => ({
-      preferred_styles: styles, avoided_styles: [], preferred_colors: [], avoided_colors: [],
+      preferred_styles: styles,
+      avoided_styles: [],
+      preferred_colors: [],
+      avoided_colors: [],
     });
 
     await app!.inject({
-      method: 'PUT', url: '/v1/preferences/style', headers: await auth(ALICE),
+      method: 'PUT',
+      url: '/v1/preferences/style',
+      headers: await auth(ALICE),
       payload: body(['minimal', 'classic']),
     });
     await app!.inject({
-      method: 'PUT', url: '/v1/preferences/style', headers: await auth(ALICE),
+      method: 'PUT',
+      url: '/v1/preferences/style',
+      headers: await auth(ALICE),
       payload: body(['minimal']),
     });
 
     const read = await app!.inject({
-      method: 'GET', url: '/v1/preferences/style', headers: await auth(ALICE),
+      method: 'GET',
+      url: '/v1/preferences/style',
+      headers: await auth(ALICE),
     });
     expect(read.json().preferred_styles).toEqual(['minimal']);
   });
@@ -439,10 +457,14 @@ describe('style preferences (task 11.1)', () => {
     await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(ALICE) });
 
     const res = await app!.inject({
-      method: 'PUT', url: '/v1/preferences/style', headers: await auth(ALICE),
+      method: 'PUT',
+      url: '/v1/preferences/style',
+      headers: await auth(ALICE),
       payload: {
-        preferred_styles: ['not-a-real-style'], avoided_styles: [],
-        preferred_colors: [], avoided_colors: [],
+        preferred_styles: ['not-a-real-style'],
+        avoided_styles: [],
+        preferred_colors: [],
+        avoided_colors: [],
       },
     });
     expect(res.statusCode).toBe(422);
@@ -454,7 +476,9 @@ describe('style preferences (task 11.1)', () => {
     // the only one.
     await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(ALICE) });
     const me = await app!.inject({
-      method: 'GET', url: '/v1/auth/me', headers: await auth(ALICE),
+      method: 'GET',
+      url: '/v1/auth/me',
+      headers: await auth(ALICE),
     });
 
     await expect(
@@ -474,15 +498,21 @@ describe('style preferences (task 11.1)', () => {
     await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(BOB) });
 
     await app!.inject({
-      method: 'PUT', url: '/v1/preferences/style', headers: await auth(ALICE),
+      method: 'PUT',
+      url: '/v1/preferences/style',
+      headers: await auth(ALICE),
       payload: {
-        preferred_styles: ['minimal'], avoided_styles: [],
-        preferred_colors: [], avoided_colors: [],
+        preferred_styles: ['minimal'],
+        avoided_styles: [],
+        preferred_colors: [],
+        avoided_colors: [],
       },
     });
 
     const bob = await app!.inject({
-      method: 'GET', url: '/v1/preferences/style', headers: await auth(BOB),
+      method: 'GET',
+      url: '/v1/preferences/style',
+      headers: await auth(BOB),
     });
     expect(bob.json().preferred_styles).toEqual([]);
   });
@@ -493,7 +523,9 @@ describe('feedback signals (task 11.2)', () => {
     await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(ALICE) });
 
     const res = await app!.inject({
-      method: 'GET', url: '/v1/preferences/signals', headers: await auth(ALICE),
+      method: 'GET',
+      url: '/v1/preferences/signals',
+      headers: await auth(ALICE),
     });
 
     expect(res.statusCode).toBe(200);
@@ -506,7 +538,9 @@ describe('feedback signals (task 11.2)', () => {
   dbIt('says which signals nothing can emit yet', async () => {
     await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(ALICE) });
     const res = await app!.inject({
-      method: 'GET', url: '/v1/preferences/signals', headers: await auth(ALICE),
+      method: 'GET',
+      url: '/v1/preferences/signals',
+      headers: await auth(ALICE),
     });
 
     // A zero here would otherwise read as "never happened" rather than "the
@@ -519,7 +553,9 @@ describe('feedback signals (task 11.2)', () => {
   dbIt('refuses a swap missing half of itself', async () => {
     // A swap without both garments says nothing learnable.
     const me = await app!.inject({
-      method: 'GET', url: '/v1/auth/me', headers: await auth(ALICE),
+      method: 'GET',
+      url: '/v1/auth/me',
+      headers: await auth(ALICE),
     });
 
     await expect(

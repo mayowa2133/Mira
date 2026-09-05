@@ -87,7 +87,11 @@ export default function AddScreen() {
           testID={`add-${option.label.split(' ')[0]?.toLowerCase()}`}
         >
           <View style={styles.rowIcon}>
-            <Icon name={option.icon} size={22} color={option.to ? color.text : color.textTertiary} />
+            <Icon
+              name={option.icon}
+              size={22}
+              color={option.to ? color.text : color.textTertiary}
+            />
           </View>
           <Text style={[styles.rowLabel, !option.to && styles.rowLabelPending]}>
             {option.label}

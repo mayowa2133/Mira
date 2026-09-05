@@ -40,7 +40,8 @@ async function cutoutPng(options: { coverage: 'good' | 'speck' | 'confetti' }): 
   if (options.coverage === 'good') paint(120, 75, 280, 425);
   if (options.coverage === 'speck') paint(0, 0, 20, 20);
   if (options.coverage === 'confetti') {
-    for (let y = 0; y < height; y += 8) for (let x = 0; x < width; x += 8) paint(x, y, x + 3, y + 3);
+    for (let y = 0; y < height; y += 8)
+      for (let x = 0; x < width; x += 8) paint(x, y, x + 3, y + 3);
   }
 
   return sharp(raw, { raw: { width, height, channels: 4 } })

@@ -9,11 +9,7 @@
  * Phase 0 defines the interfaces and a stub provider. Real providers arrive in
  * Phase 3 (`docs/08-engineering/implementation-plan.md`).
  */
-import type {
-  OutfitProposal,
-  QueryInterpretation,
-  TagReading,
-} from './contracts.js';
+import type { OutfitProposal, QueryInterpretation, TagReading } from './contracts.js';
 import type { Validated } from './pipeline.js';
 
 export type ImageRef = {

@@ -77,8 +77,7 @@ const metric = (
   value,
   target,
   direction,
-  passed:
-    n === 0 ? emptyPasses : direction === 'at_least' ? value >= target : value <= target,
+  passed: n === 0 ? emptyPasses : direction === 'at_least' ? value >= target : value <= target,
   n,
 });
 
@@ -114,10 +113,7 @@ export function categoryAccuracy(cases: EvaluationCase[], predictions: Predictio
  * would let a model that returns every plausible colour score well while being
  * useless in a closet, where "the black dress" has to mean something.
  */
-export function primaryColorAccuracy(
-  cases: EvaluationCase[],
-  predictions: Prediction[],
-): Metric {
+export function primaryColorAccuracy(cases: EvaluationCase[], predictions: Prediction[]): Metric {
   const byId = new Map(predictions.map((p) => [p.id, p]));
   let correct = 0;
   let total = 0;
@@ -131,7 +127,13 @@ export function primaryColorAccuracy(
     if (prediction.colors[0] === expected) correct += 1;
   }
 
-  return metric('primary_color_accuracy', total === 0 ? 0 : correct / total, 0.93, 'at_least', total);
+  return metric(
+    'primary_color_accuracy',
+    total === 0 ? 0 : correct / total,
+    0.93,
+    'at_least',
+    total,
+  );
 }
 
 /**

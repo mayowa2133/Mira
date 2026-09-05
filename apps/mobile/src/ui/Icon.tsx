@@ -79,14 +79,20 @@ function IconComponent({ name, size = 24, color, filled = false }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden>
       {name === 'home' ? (
-        <Path d="M3.5 10.2 12 3.75l8.5 6.45V19a1.25 1.25 0 0 1-1.25 1.25h-14A1.25 1.25 0 0 1 4 19v-8.8Z" {...common} />
+        <Path
+          d="M3.5 10.2 12 3.75l8.5 6.45V19a1.25 1.25 0 0 1-1.25 1.25h-14A1.25 1.25 0 0 1 4 19v-8.8Z"
+          {...common}
+        />
       ) : null}
 
       {/* A hanger, not a folder or a shirt: the closet is a rail. */}
       {name === 'hanger' ? (
         <>
           <Path d="M12 8.5a2 2 0 1 1 2-2c0 1.2-2 1.1-2 2Z" {...common} />
-          <Path d="M12 8.5 3.6 15.1a1.1 1.1 0 0 0 .7 2h15.4a1.1 1.1 0 0 0 .7-2L12 8.5Z" {...common} />
+          <Path
+            d="M12 8.5 3.6 15.1a1.1 1.1 0 0 0 .7 2h15.4a1.1 1.1 0 0 0 .7-2L12 8.5Z"
+            {...common}
+          />
         </>
       ) : null}
 
@@ -101,7 +107,10 @@ function IconComponent({ name, size = 24, color, filled = false }: IconProps) {
 
       {name === 'looks' ? (
         <>
-          <Path d="M4 4.75h6.5v6.5H4zM13.5 4.75H20v6.5h-6.5zM4 12.75h6.5v6.5H4zM13.5 12.75H20v6.5h-6.5z" {...common} />
+          <Path
+            d="M4 4.75h6.5v6.5H4zM13.5 4.75H20v6.5h-6.5zM4 12.75h6.5v6.5H4zM13.5 12.75H20v6.5h-6.5z"
+            {...common}
+          />
         </>
       ) : null}
 
@@ -121,9 +130,7 @@ function IconComponent({ name, size = 24, color, filled = false }: IconProps) {
 
       {name === 'close' ? <Path d="M6.5 6.5l11 11M17.5 6.5l-11 11" {...common} /> : null}
 
-      {name === 'filter' ? (
-        <Path d="M4.25 7h15.5M7 12h10M10 17h4" {...common} />
-      ) : null}
+      {name === 'filter' ? <Path d="M4.25 7h15.5M7 12h10M10 17h4" {...common} /> : null}
 
       {name === 'plus' ? <Path d="M12 5.25v13.5M5.25 12h13.5" {...common} /> : null}
 
@@ -149,7 +156,10 @@ function IconComponent({ name, size = 24, color, filled = false }: IconProps) {
 
       {name === 'receipt' ? (
         <>
-          <Path d="M5.75 3.75h12.5v16.5l-2.1-1.5-2.1 1.5-2.1-1.5-2.1 1.5-2.1-1.5-2 1.5z" {...common} />
+          <Path
+            d="M5.75 3.75h12.5v16.5l-2.1-1.5-2.1 1.5-2.1-1.5-2.1 1.5-2.1-1.5-2 1.5z"
+            {...common}
+          />
           <Path d="M9 8h6M9 11.5h6" {...common} />
         </>
       ) : null}
@@ -163,7 +173,10 @@ function IconComponent({ name, size = 24, color, filled = false }: IconProps) {
 
       {name === 'tag' ? (
         <>
-          <Path d="M11.4 3.75H20.25v8.85l-8.4 8.4a1.2 1.2 0 0 1-1.7 0L3 13.85a1.2 1.2 0 0 1 0-1.7z" {...common} />
+          <Path
+            d="M11.4 3.75H20.25v8.85l-8.4 8.4a1.2 1.2 0 0 1-1.7 0L3 13.85a1.2 1.2 0 0 1 0-1.7z"
+            {...common}
+          />
           <Circle cx={16.25} cy={7.75} r={1.4} {...common} />
         </>
       ) : null}

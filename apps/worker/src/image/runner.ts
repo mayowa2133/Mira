@@ -11,12 +11,7 @@
  */
 import { UnsupportedImage } from './decode.js';
 import { processImage, type ImageProcessPorts } from './process.js';
-import {
-  claimNextJob,
-  recordFailure,
-  recordResult,
-  type ClaimedJob,
-} from './repository.js';
+import { claimNextJob, recordFailure, recordResult, type ClaimedJob } from './repository.js';
 import type { Pool } from 'pg';
 
 /** Matches the queue's own policy in `queue.ts`. */
@@ -43,10 +38,7 @@ export type RunnerDeps = {
  * of racing a timer.
  */
 export async function processOneJob(deps: RunnerDeps): Promise<boolean> {
-  const job = await claimNextJob(
-    deps.pool,
-    deps.onlyUserId ? { userId: deps.onlyUserId } : {},
-  );
+  const job = await claimNextJob(deps.pool, deps.onlyUserId ? { userId: deps.onlyUserId } : {});
   if (!job) return false;
 
   const started = Date.now();
@@ -69,8 +61,7 @@ export async function processOneJob(deps: RunnerDeps): Promise<boolean> {
       mediumKey: report.derivatives.find((d) => d.name === 'medium')?.storageKey ?? null,
       // Only an ACCEPTED cutout becomes canonical. A rejected one is discarded
       // and the original keeps the position (image-processing.md §3).
-      cutoutStorageKey:
-        report.cutout.status === 'accepted' ? report.cutout.storageKey : null,
+      cutoutStorageKey: report.cutout.status === 'accepted' ? report.cutout.storageKey : null,
     });
 
     deps.logger.info('image.process complete', {

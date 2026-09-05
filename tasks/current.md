@@ -188,11 +188,11 @@ weak evidence.
 
 | # | Task | Status |
 | - | ---- | ------ |
-| 4.1 | Tag camera + barcode detection | **Not started** |
+| 4.1 | Tag camera + barcode detection | **Done** — barcodes are read on device; reading the label's WORDS is 4.2 |
 | 4.2 | OCR + tag reading | **Not started** — needs a vision provider |
-| 4.3 | Receipt capture | **Not started** |
+| 4.3 | Receipt capture | **Done** — the image is captured and stored; reading it is 4.4 |
 | 4.4 | receipt.parse worker | **Not started** — needs a vision provider |
-| 4.5 | Multi-item confirmation list | **Not started** |
+| 4.5 | Multi-item confirmation list | **Done** — list and totals reconciliation, tested against fixtures; nothing produces real lines until 4.4 |
 | 4.6 | Duplicate detection: signals, scoring, thresholds | **Done** — eight of nine signals; the ninth needs Phase 5 embeddings |
 | 4.7 | Duplicate resolution sheet + merge + garment_duplicates | **Done** — API and sheet |
 | 4.8 | Evaluation: tags, receipts, duplicate pairs | **Duplicates done**; tags and receipts need a vision provider |

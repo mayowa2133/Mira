@@ -1,0 +1,457 @@
+[
+  {
+    "id": "0.1",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "0.2",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "0.3",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "0.4",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "0.5",
+    "needsProvider": false,
+    "status": "partial",
+    "note": "endpoints + screens done; sign-in needs an identity provider"
+  },
+  {
+    "id": "0.6",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "0.7",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "0.8",
+    "needsProvider": false,
+    "status": "partial",
+    "note": "env config supports four; no deployed dev/staging/prod"
+  },
+  {
+    "id": "0.9",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "0.10",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "1.1",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "1.2",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "1.3",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "1.4",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "1.5",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "1.6",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "1.7",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "1.8",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "2.1",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "2.2",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "2.3",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "2.4",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "2.5",
+    "needsProvider": true,
+    "status": "partial",
+    "note": "code + gate done; no segmentation provider"
+  },
+  {
+    "id": "2.6",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "2.7",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "3.1",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "3.2",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "3.3",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "3.4",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "3.5",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "3.6",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "3.7",
+    "needsProvider": true,
+    "status": "todo",
+    "note": "needs a product catalogue"
+  },
+  {
+    "id": "3.8",
+    "needsProvider": true,
+    "status": "partial",
+    "note": "harness done; 200-image dataset blocked"
+  },
+  {
+    "id": "4.1",
+    "needsProvider": false,
+    "status": "done",
+    "note": "barcode detection is on-device"
+  },
+  {
+    "id": "4.2",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "4.3",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "4.4",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "4.5",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "4.6",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "4.7",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "4.8",
+    "needsProvider": true,
+    "status": "partial",
+    "note": "duplicates done; tags/receipts blocked"
+  },
+  {
+    "id": "5.1",
+    "needsProvider": false,
+    "status": "done",
+    "note": "garment_embeddings table exists; no HNSW index yet"
+  },
+  {
+    "id": "5.2",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "5.3",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "5.4",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "5.5",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "5.6",
+    "needsProvider": false,
+    "status": "done",
+    "note": "filter sheet completion"
+  },
+  {
+    "id": "5.7",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "6.1",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "6.2",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "6.3",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "6.4",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "6.5",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "7.1",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "7.2",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "7.3",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "7.4",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "7.5",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "7.6",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "7.7",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "7.8",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "8.1",
+    "needsProvider": false,
+    "status": "todo",
+    "note": "OAuth + encrypted token storage"
+  },
+  {
+    "id": "8.2",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "8.3",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "8.4",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "8.5",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "8.6",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "8.7",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "8.8",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "8.9",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "9.1",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "9.2",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "9.3",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "9.4",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "9.5",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "9.6",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "10.1",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "10.2",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "10.3",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "10.4",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "10.5",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "10.6",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "10.7",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "10.8",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "11.1",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "11.2",
+    "needsProvider": false,
+    "status": "done"
+  },
+  {
+    "id": "11.3",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "11.4",
+    "needsProvider": true,
+    "status": "todo"
+  },
+  {
+    "id": "11.5",
+    "needsProvider": true,
+    "status": "todo"
+  }
+]

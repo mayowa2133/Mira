@@ -92,7 +92,9 @@ export function perceptualHash(image: PixelBuffer): string {
   const sorted = [...low].sort((a, b) => a - b);
   const mid = sorted.length >> 1;
   const median =
-    sorted.length % 2 === 0 ? ((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2 : (sorted[mid] ?? 0);
+    sorted.length % 2 === 0
+      ? ((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2
+      : (sorted[mid] ?? 0);
 
   // 63 coefficients + a leading 0 for the dropped DC term = 64 bits.
   const bits = [0, ...low.map((value) => (value > median ? 1 : 0))];

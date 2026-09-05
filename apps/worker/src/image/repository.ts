@@ -232,12 +232,7 @@ export async function recordFailure(
             error_message = $4,
             finished_at = case when $2 = 'failed' then now() else null end
       where id = $1`,
-    [
-      job.id,
-      exhausted ? 'failed' : 'queued',
-      options.code,
-      options.message.slice(0, 500),
-    ],
+    [job.id, exhausted ? 'failed' : 'queued', options.code, options.message.slice(0, 500)],
   );
 }
 

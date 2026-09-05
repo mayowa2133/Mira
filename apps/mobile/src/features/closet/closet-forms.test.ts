@@ -340,7 +340,7 @@ describe('the filters §16 adds (task 5.6)', () => {
 
   it('skips a brand chip whose name has not loaded', () => {
     // A uuid on a chip is worse than no chip at all.
-    expect(appliedChips(withFilters({ brandId: ['b1' ] }))).toHaveLength(0);
+    expect(appliedChips(withFilters({ brandId: ['b1'] }))).toHaveLength(0);
   });
 
   it('says a price range the way a person would', () => {

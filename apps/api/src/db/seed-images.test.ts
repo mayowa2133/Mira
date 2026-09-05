@@ -2,12 +2,7 @@ import { encodeBlurhash } from '@mira/imaging';
 import { describe, expect, it } from 'vitest';
 import { inflateSync } from 'node:zlib';
 import { CATEGORIES, COLOR_SWATCHES, type Color } from '@mira/taxonomy';
-import {
-  encodePng,
-  hexToRgb,
-  imageHash,
-  renderGarmentImage,
-} from './seed-images.js';
+import { encodePng, hexToRgb, imageHash, renderGarmentImage } from './seed-images.js';
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const GROUND = { r: 0xf5, g: 0xf3, b: 0xf0 };
@@ -284,11 +279,15 @@ describe('blurhash', () => {
 
   it('produces the documented length for 4x3 components', () => {
     // 1 (components) + 1 (max AC) + 4 (DC) + 2 per AC component; 4x3 has 11 AC.
-    expect(encodeBlurhash({ data: pixels, width, height, channels: 3 })).toHaveLength(1 + 1 + 4 + 11 * 2);
+    expect(encodeBlurhash({ data: pixels, width, height, channels: 3 })).toHaveLength(
+      1 + 1 + 4 + 11 * 2,
+    );
   });
 
   it('uses only base83 characters', () => {
-    expect(encodeBlurhash({ data: pixels, width, height, channels: 3 })).toMatch(/^[0-9A-Za-z#$%*+,\-.:;=?@[\]^_{|}~]+$/);
+    expect(encodeBlurhash({ data: pixels, width, height, channels: 3 })).toMatch(
+      /^[0-9A-Za-z#$%*+,\-.:;=?@[\]^_{|}~]+$/,
+    );
   });
 
   it('encodes the component count in its first character', () => {
@@ -333,8 +332,6 @@ describe('image hash', () => {
     const b = renderGarmentImage({ category: 'shoes', colorHex: '#000000', width: 32, height: 40 });
     // 64 bits of hex, and two different garments do not collide.
     expect(imageHash(a.pixels, a.width, a.height)).toHaveLength(16);
-    expect(imageHash(a.pixels, a.width, a.height)).not.toBe(
-      imageHash(b.pixels, b.width, b.height),
-    );
+    expect(imageHash(a.pixels, a.width, a.height)).not.toBe(imageHash(b.pixels, b.width, b.height));
   });
 });

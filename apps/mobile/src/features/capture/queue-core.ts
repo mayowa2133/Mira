@@ -106,7 +106,9 @@ export function nextRunnable(state: QueueState, now: number): CaptureEntry | nul
   const candidates = state.entries
     .filter(
       (entry) =>
-        (entry.status === 'pending' || entry.status === 'uploading' || entry.status === 'importing') &&
+        (entry.status === 'pending' ||
+          entry.status === 'uploading' ||
+          entry.status === 'importing') &&
         entry.nextAttemptAt <= now,
     )
     .sort((a, b) => a.createdAt - b.createdAt);

@@ -43,7 +43,10 @@ const logger = {
 const whatHappened = () => (logged.length ? logged.join('\n') : '(nothing logged)');
 
 /** A vision provider that says exactly what a test needs it to say. */
-function visionSaying(payload: unknown, overrides: Partial<RawModelResponse> = {}): VisionCapability {
+function visionSaying(
+  payload: unknown,
+  overrides: Partial<RawModelResponse> = {},
+): VisionCapability {
   return {
     async analyzeGarment(): Promise<RawModelResponse> {
       return {

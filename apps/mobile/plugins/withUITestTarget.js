@@ -17,7 +17,11 @@ const TARGET_NAME = 'MiraUITests';
 const SOURCE_DIR = path.join('e2e', TARGET_NAME);
 const UI_TESTING_PRODUCT_TYPE = 'com.apple.product-type.bundle.ui-testing';
 
-const swiftFilesIn = (dir) => fs.readdirSync(dir).filter((f) => f.endsWith('.swift')).sort();
+const swiftFilesIn = (dir) =>
+  fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.swift'))
+    .sort();
 
 /**
  * Link the tracked Swift sources into the generated project.

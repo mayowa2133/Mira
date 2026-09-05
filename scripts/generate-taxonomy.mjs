@@ -10,13 +10,23 @@
  * documentation edit that breaks the expected format breaks the build rather
  * than silently emitting an empty enum.
  */
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE = resolve(root, 'docs/04-data/taxonomy.md');
 const OUT = resolve(root, 'packages/taxonomy/src/generated.ts');
+
+/**
+ * `--check` verifies rather than writes.
+ *
+ * It used to do neither: the script had no argument handling at all, so
+ * `generate:taxonomy:check` regenerated the file, overwrote whatever evidence
+ * of drift was there, and exited 0. It was a check that could not fail — which
+ * is worse than no check, because the package.json entry made it look covered.
+ */
+const CHECK = process.argv.includes('--check');
 
 const md = readFileSync(SOURCE, 'utf8');
 
@@ -339,8 +349,26 @@ export const confidenceBand = (value: number): ConfidenceBand => {
 };
 `);
 
+const generated = parts.join('\n');
+
+if (CHECK) {
+  const current = existsSync(OUT) ? readFileSync(OUT, 'utf8') : null;
+  if (current !== generated) {
+    console.error(
+      `\n  generate-taxonomy: ${OUT}\n` +
+        `  is out of date with ${SOURCE}.\n\n` +
+        `  The generated file is never edited by hand (INV-1). Run:\n` +
+        `    npm run generate:taxonomy\n` +
+        `  and commit the result.\n`,
+    );
+    process.exit(1);
+  }
+  console.log('generate-taxonomy: generated.ts is up to date');
+  process.exit(0);
+}
+
 mkdirSync(dirname(OUT), { recursive: true });
-writeFileSync(OUT, parts.join('\n'), 'utf8');
+writeFileSync(OUT, generated, 'utf8');
 
 const counts = Object.entries(sets)
   .map(([k, v]) => `${k}=${v.length}`)

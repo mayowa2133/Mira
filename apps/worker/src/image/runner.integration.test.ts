@@ -175,9 +175,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await pool?.query('delete from users where auth_provider_id = $1', ['worker-it']).catch(
-    () => undefined,
-  );
+  await pool
+    ?.query('delete from users where auth_provider_id = $1', ['worker-it'])
+    .catch(() => undefined);
   await pool?.end();
   rmSync(storageRoot, { recursive: true, force: true });
 });
@@ -210,14 +210,21 @@ const dbIt = (name: string, fn: () => Promise<void>) =>
 
 describe('processOneJob', () => {
   dbIt('reports nothing to do on an empty queue', async () => {
-    const worked = await processOneJob({ pool: pool!, ports: portsWith(), logger, onlyUserId: userId });
+    const worked = await processOneJob({
+      pool: pool!,
+      ports: portsWith(),
+      logger,
+      onlyUserId: userId,
+    });
     expect(worked).toBe(false);
   });
 
   dbIt('fills in the facts the closet needs, and completes the job', async () => {
     const { imageId, jobId } = await seedCapture();
 
-    expect(await processOneJob({ pool: pool!, ports: portsWith(), logger, onlyUserId: userId })).toBe(true);
+    expect(
+      await processOneJob({ pool: pool!, ports: portsWith(), logger, onlyUserId: userId }),
+    ).toBe(true);
 
     const image = await pool!.query(
       'select width, height, blurhash, image_hash from garment_images where id = $1',
@@ -387,9 +394,10 @@ describe('processOneJob', () => {
 
       await processOneJob({ pool: pool!, ports: portsWith(), logger, onlyUserId: userId });
 
-      const job = await pool!.query('select status, attempts, error_code from ingestion_jobs where id = $1', [
-        jobId,
-      ]);
+      const job = await pool!.query(
+        'select status, attempts, error_code from ingestion_jobs where id = $1',
+        [jobId],
+      );
       // Retrying cannot make a text file decodable.
       expect(job.rows[0].status).toBe('failed');
       expect(job.rows[0].attempts).toBe(1);

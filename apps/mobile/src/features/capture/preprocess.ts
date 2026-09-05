@@ -15,7 +15,6 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { Directory, File, Paths } from 'expo-file-system';
 import { CAPTURE_DIR, JPEG_QUALITY, constrain } from './preprocess-core';
 
-
 function captureDirectory(): Directory {
   const directory = new Directory(Paths.document, CAPTURE_DIR);
   if (!directory.exists) directory.create({ intermediates: true });

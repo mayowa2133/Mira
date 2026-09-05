@@ -142,8 +142,7 @@ const dress: Silhouette = (x, y) => {
 
   // A waist. Without it this is a trapezoid, which is what it was — and a
   // trapezoid is the shape of a lampshade, not of a dress.
-  const half =
-    y < WAIST ? taper(y, TOP, WAIST, 0.175, 0.145) : taper(y, WAIST, HEM, 0.145, 0.305);
+  const half = y < WAIST ? taper(y, TOP, WAIST, 0.175, 0.145) : taper(y, WAIST, HEM, 0.145, 0.305);
   if (cx > half) return false;
   return !necklineCutsAway(cx, y, TOP, 0.105, 0.055);
 };
@@ -312,7 +311,7 @@ function variationFor(variant: number): Variation {
   const b = (variant * 0.7548776662) % 1;
   const c = (variant * 0.3247179572) % 1;
   return {
-    angle: (a - 0.5) * 0.10, // ±2.9°
+    angle: (a - 0.5) * 0.1, // ±2.9°
     scale: 1 + (b - 0.5) * 0.09, // ±4.5%
     phase: c * Math.PI * 2,
   };
