@@ -21,6 +21,7 @@ import { registerClosetRoutes } from '../modules/closet/routes.js';
 import { DuplicateRepository } from '../modules/closet/duplicate-repository.js';
 import { DuplicateService } from '../modules/closet/duplicate-service.js';
 import { registerMediaRoutes } from '../modules/media/routes.js';
+import { registerBodyRoutes } from '../modules/body/routes.js';
 import { registerImportRoutes } from '../modules/imports/routes.js';
 import { ImportsRepository } from '../modules/imports/repository.js';
 import { ImportsService, type JobEnqueuer } from '../modules/imports/service.js';
@@ -257,6 +258,8 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
       await registerPreferenceRoutes(instance);
 
       await registerNotificationRoutes(instance);
+
+      await registerBodyRoutes(instance, { storage });
 
       await registerPurchaseRoutes(instance, {
         service: new PurchaseService(

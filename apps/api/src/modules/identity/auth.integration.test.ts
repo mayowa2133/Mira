@@ -487,3 +487,46 @@ describe('style preferences (task 11.1)', () => {
     expect(bob.json().preferred_styles).toEqual([]);
   });
 });
+
+describe('feedback signals (task 11.2)', () => {
+  dbIt('reads saves and wears from where they already live', async () => {
+    await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(ALICE) });
+
+    const res = await app!.inject({
+      method: 'GET', url: '/v1/preferences/signals', headers: await auth(ALICE),
+    });
+
+    expect(res.statusCode).toBe(200);
+    // Not copies: `saves` is outfits.favorite and `wears` is wear_events. A
+    // third statement of the same fact would eventually disagree with them.
+    expect(res.json()).toHaveProperty('saves');
+    expect(res.json()).toHaveProperty('wears');
+  });
+
+  dbIt('says which signals nothing can emit yet', async () => {
+    await app!.inject({ method: 'POST', url: '/v1/auth/session', headers: await auth(ALICE) });
+    const res = await app!.inject({
+      method: 'GET', url: '/v1/preferences/signals', headers: await auth(ALICE),
+    });
+
+    // A zero here would otherwise read as "never happened" rather than "the
+    // stylist that emits this does not exist", and 11.3 must not learn from
+    // the difference.
+    expect(res.json().unavailable).toEqual(['swap', 'regeneration']);
+    expect(res.json().swaps).toBe(0);
+  });
+
+  dbIt('refuses a swap missing half of itself', async () => {
+    // A swap without both garments says nothing learnable.
+    const me = await app!.inject({
+      method: 'GET', url: '/v1/auth/me', headers: await auth(ALICE),
+    });
+
+    await expect(
+      pool!.query(
+        `insert into feedback_events (user_id, kind, replaced_id) values ($1, 'swap', gen_random_uuid())`,
+        [me.json().id],
+      ),
+    ).rejects.toThrow();
+  });
+});

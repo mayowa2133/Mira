@@ -594,3 +594,38 @@ Format:
   the worker. That conversation has to happen before Phase 7, which adds
   substantially more query surface. It should be reopened as its own decision,
   not folded into a cost question.
+
+## D-033 — Body images have no `deleted_at`
+
+- **Date:** 2026-09-05 · **Status:** Accepted
+- **Decision:** `body_profile_images` is created without a `deleted_at` column,
+  diverging from `database-schema.md`, which lists one.
+- **Why:** the same document says two lines later that deletion here is **hard
+  deletion of the object and its derivatives**, and `data-retention.md` is
+  blunter still: "A user deleting a photograph of their own body must not be
+  told it is in a recycle bin for a month." A soft-delete column on a table that
+  must never be soft-deleted is an invitation, and the invitation only has to be
+  accepted once. Where the two readings conflict, the one describing behaviour
+  wins over the one describing a shape — the same resolution as D-027.
+- **Consequences:** the delete path removes the storage object first and the row
+  second, because the reverse loses the key and leaves an unreachable,
+  undeleted file. Deleting a whole profile also prefix-deletes the bucket, so an
+  object whose row was lost to an interrupted upload cannot outlive the profile.
+  A test asserts the column's absence, so re-adding it fails rather than
+  quietly reopening the possibility.
+
+## D-034 — Feedback signals are read where they already live
+
+- **Date:** 2026-09-05 · **Status:** Accepted
+- **Decision:** `feedback_events` stores only swaps and regenerations. Saves are
+  read from `outfits.favorite` and wears from `wear_events`; neither is copied.
+- **Why:** task 11.2 names four signals, and two of them are already recorded.
+  Writing them a second time would state one fact in two places, and the two
+  would eventually disagree — at which point nothing could say which was right.
+  `SignalRepository` is the single place that knows they are stored differently.
+- **Consequences:** the counts endpoint returns an `unavailable` list naming
+  swaps and regenerations, because nothing emits them until Phase 7 and a zero
+  would otherwise read as "this never happened" rather than "the thing that
+  emits it does not exist". 11.3 must not learn from that difference. Wears
+  count garment events only: an outfit wear also writes one row per garment, and
+  counting both would double every look someone wore.
