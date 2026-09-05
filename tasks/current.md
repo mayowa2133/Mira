@@ -283,34 +283,45 @@ claimed while the first half of that sentence is impossible.
 
 ## Where the AI-free work stands
 
-**45 of 59 AI-free tasks (76%).** 46.5 of the whole 89-task plan (52%).
+**57 of 59 AI-free tasks (97%).** 58.5 of the whole 89-task plan (66%).
 
-Landed this session: 4.6, 4.7, 4.8 (duplicates), 9.2, 9.5, 5.1, 5.6, 11.1,
-§28, the auth endpoints, the onboarding screens, and the account deletion
-worker.
+Everything buildable without a provider is built. What remains needs you:
 
-### Still open, and honestly why
+| Task | What it needs |
+| ---- | ------------- |
+| 0.5 | A Supabase project. Endpoints, screens and routing are done; **nobody can sign in** until one exists (D-032) |
+| 0.8 | Somewhere to deploy. The env config supports four environments; none are hosted |
+| 8.1 | Google OAuth credentials for email scanning |
 
-| Task | Why it is not done |
-| ---- | ------------------ |
-| 0.5 | Endpoints and screens exist; **nobody can sign in** until a Supabase project is created (D-032) |
-| 0.8 | Env config supports four environments; none are deployed |
-| 8.1 | Email OAuth needs Google credentials |
-| 4.1, 4.3, 4.5 | Capture screens with nothing reading what they capture |
-| 8.3, 8.5–8.8 | Purchase review with no candidates to review |
-| 10.1, 10.2, 10.7 | A biometric gate protects nothing until 10.2 creates body images, and a deletion path needs rows to delete |
-| 11.2 | Two of its four signals (swaps, regenerations) are Phase 7; the other two are already recorded in `outfits.favorite` and `wear_events`. A `feedback_events` table now would be a third copy with nothing reading it |
+### What "done" means for the last twelve
 
-The pattern in the bottom four rows is the same: they are **buildable and
-inert**. Building them produces surfaces that look finished and do nothing,
-which is what `CLAUDE.md` means by not letting implementation convenience turn
-the product into an inventory interface.
+They were built knowing they are **inert** — the concern is recorded above and
+was overruled deliberately. Each one ends by saying what it cannot do yet rather
+than looking finished:
 
-### Exit criteria that are open on work marked done
+- **Tag scan** reads barcodes for real; reading the label's words is 4.2 and
+  needs a vision provider. A found barcode is carried into the form as an
+  identifier, not as an understanding.
+- **Receipt capture** saves the image and says outright that Mira cannot read it
+  yet. The confirmation list and totals reconciliation are built and tested
+  against fixtures; nothing produces real lines until 4.4.
+- **Purchase review** is complete and works on real candidates — but nothing
+  creates candidates until `email.scan` (8.2) exists. Its empty state says so
+  rather than implying the account is empty.
+- **Body profile** stores height, sizes and preferences, and deletes hard. The
+  photo slots say "Phase 10" rather than opening a camera that leads nowhere.
+- **Feedback signals** read saves and wears from where they already live; swaps
+  and regenerations have a schema and a writer but no emitter until Phase 7,
+  and the API says which is which (D-034).
+
+### Exit criteria still open on work marked done
 
 - **1.x** — the 60 fps claim rests on a duration metric, not a frame rate.
 - **4.8** — duplicate recall is 0.88 against a 0.90 target (D-029).
 - **0.5** — "sign in on a device" is impossible today.
+- **10.2** — the biometric gate typechecks and its logic is tested, but
+  `expo-local-authentication` is a native dependency and it has not been run on
+  the simulator.
 
 ## Known flakes
 
