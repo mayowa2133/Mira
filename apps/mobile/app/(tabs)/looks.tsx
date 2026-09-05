@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/ui/Text';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
@@ -207,9 +208,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: color.border,
   },
-  tabActive: { backgroundColor: color.accentSoft, borderColor: color.accentSoft },
+  tabActive: { backgroundColor: color.accent, borderColor: color.accent },
   tabLabel: { fontSize: type.subhead.fontSize, color: color.textSecondary },
-  tabLabelActive: { color: color.text },
+  tabLabelActive: { color: color.inverseText },
 
   content: { paddingHorizontal: space.screenX, paddingBottom: space.giant },
   masonry: { flexDirection: 'row', gap: space.md, paddingTop: space.md },

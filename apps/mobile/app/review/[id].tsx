@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/ui/Text';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -72,7 +73,9 @@ export default function ReviewScreen() {
             <Image
               style={styles.image}
               source={{ uri: image }}
-              placeholder={g.canonical_image?.blurhash ? { blurhash: g.canonical_image.blurhash } : undefined}
+              placeholder={
+                g.canonical_image?.blurhash ? { blurhash: g.canonical_image.blurhash } : undefined
+              }
               contentFit="cover"
               transition={160}
               accessible={false}
@@ -119,7 +122,11 @@ export default function ReviewScreen() {
           <Text style={styles.pending}>Still looking…</Text>
         ) : (
           rows.map((row) => (
-            <ReviewFieldRow key={row.field} row={row} onPress={() => router.push(`/edit/${g.id}`)} />
+            <ReviewFieldRow
+              key={row.field}
+              row={row}
+              onPress={() => router.push(`/edit/${g.id}`)}
+            />
           ))
         )}
       </ScrollView>

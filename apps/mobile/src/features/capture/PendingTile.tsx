@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/ui/Text';
 import { Image } from 'expo-image';
 import { color, radius, space, type } from '@mira/ui';
 import type { CaptureEntry } from './queue-core';
@@ -38,9 +39,7 @@ export function PendingTile({ entry, onRetry, onDiscard }: PendingTileProps) {
       onPress={failed ? () => onRetry(entry.id) : undefined}
       accessibilityRole={failed ? 'button' : 'image'}
       accessibilityLabel={label}
-      accessibilityActions={
-        failed ? [{ name: 'discard', label: 'Remove this photo' }] : undefined
-      }
+      accessibilityActions={failed ? [{ name: 'discard', label: 'Remove this photo' }] : undefined}
       onAccessibilityAction={(event) => {
         if (event.nativeEvent.actionName === 'discard') onDiscard(entry.id);
       }}

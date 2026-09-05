@@ -1,10 +1,12 @@
 import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/ui/Text';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
+import { Icon } from '@/ui/Icon';
 
 /**
  * Scan receipt (§11, task 4.3).
@@ -112,7 +114,7 @@ export default function ScanReceiptScreen() {
           accessibilityRole="button"
           accessibilityLabel="Close"
         >
-          <Text style={styles.close}>✕</Text>
+          <Icon name="close" size={22} color={color.text} />
         </Pressable>
       </View>
 

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text, TextInput } from '@/ui/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CATEGORIES, OCCASIONS, SEASONS } from '@mira/taxonomy';
 import { color, radius, space, type } from '@mira/ui';
@@ -368,7 +369,7 @@ const styles = StyleSheet.create({
     borderColor: color.border,
     backgroundColor: color.surface,
   },
-  statusChipActive: { backgroundColor: color.accentSoft, borderColor: color.accentSoft },
+  statusChipActive: { backgroundColor: color.accent, borderColor: color.accent },
   statusLabel: { fontSize: type.subhead.fontSize, color: color.textSecondary },
   search: {
     minHeight: space.tapMin,
@@ -385,7 +386,7 @@ const styles = StyleSheet.create({
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   priceInput: { flex: 1 },
   priceDash: { fontSize: type.body.fontSize, color: color.textSecondary },
-  statusLabelActive: { color: color.text, fontWeight: type.bodyStrong.fontWeight },
+  statusLabelActive: { color: color.inverseText, fontWeight: type.bodyStrong.fontWeight },
 
   footer: {
     paddingHorizontal: space.screenX,

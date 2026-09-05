@@ -1,17 +1,11 @@
 import { useCallback } from 'react';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Text } from '@/ui/Text';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
+import { Icon } from '@/ui/Icon';
 import { ApiError } from '@/lib/api';
 import { ClosetGridSkeleton, ClosetState } from '@/features/closet/ClosetGrid';
 import {
@@ -272,9 +266,12 @@ export default function GarmentDetailScreen() {
             accessibilityLabel={g.favorite ? 'Remove from favourites' : 'Favourite'}
             hitSlop={space.sm}
           >
-            <Text style={[styles.heart, g.favorite && styles.heartOn]}>
-              {g.favorite ? '♥' : '♡'}
-            </Text>
+            <Icon
+              name="heart"
+              size={24}
+              filled={g.favorite}
+              color={g.favorite ? color.accent : color.text}
+            />
           </Pressable>
         </View>
 

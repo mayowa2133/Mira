@@ -19,7 +19,7 @@ describe('the You screen', () => {
     // CAP-4: degrade rather than dead-end. A settings row that opens nothing
     // and explains nothing reads as broken.
     for (const row of PROFILE_ROWS) {
-      if (row.to === null && row.phase === null) {
+      if (row.to === null && row.status === null) {
         expect(['help', 'about']).toContain(row.key);
       }
     }

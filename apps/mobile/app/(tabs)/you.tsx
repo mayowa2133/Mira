@@ -1,7 +1,9 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/ui/Text';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
+import { Icon } from '@/ui/Icon';
 import { PROFILE_ROWS } from '@/features/profile/rows';
 import { useMe } from '@/features/identity/queries';
 import { describeLoadFailure } from '@/features/closet/load-failure';
@@ -12,7 +14,7 @@ import { ClosetState } from '@/features/closet/ClosetGrid';
  *
  * A plain list, deliberately. This is the one screen in Mira that should look
  * like settings, because that is what someone comes here to do — and the rows
- * that do not exist yet say which phase brings them rather than opening nothing.
+ * that do not exist yet say so in words rather than opening nothing.
  */
 export default function YouScreen() {
   const router = useRouter();
@@ -48,20 +50,27 @@ export default function YouScreen() {
           </View>
 
           <View style={styles.rows}>
-            {PROFILE_ROWS.map((row) => (
+            {PROFILE_ROWS.map((row, index) => (
               <Pressable
                 key={row.key}
-                style={styles.row}
+                // A divider under the LAST row has nothing beneath it to
+                // separate, and the container's radius clips it into a short
+                // inset line that reads as a rendering fault.
+                style={[styles.row, index === PROFILE_ROWS.length - 1 && styles.rowLast]}
                 disabled={!row.to}
                 onPress={() => row.to && router.push(row.to as never)}
                 accessibilityRole="button"
-                accessibilityLabel={row.phase ? `${row.label}, ${row.phase}` : row.label}
+                accessibilityLabel={row.status ? `${row.label}, ${row.status}` : row.label}
                 testID={`profile-${row.key}`}
               >
                 <Text style={[styles.rowLabel, !row.to && styles.rowLabelPending]}>
                   {row.label}
                 </Text>
-                <Text style={styles.rowMeta}>{row.phase ?? '›'}</Text>
+                {row.status ? (
+                  <Text style={styles.rowMeta}>{row.status}</Text>
+                ) : (
+                  <Icon name="chevronRight" size={18} color={color.textTertiary} />
+                )}
               </Pressable>
             ))}
           </View>
@@ -99,6 +108,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: color.divider,
   },
+  rowLast: { borderBottomWidth: 0 },
   rowLabel: { fontSize: type.body.fontSize, color: color.text },
   rowLabelPending: { color: color.textSecondary },
   rowMeta: { fontSize: type.caption.fontSize, color: color.textTertiary },

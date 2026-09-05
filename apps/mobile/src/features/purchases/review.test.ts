@@ -56,8 +56,8 @@ describe('the footer and header', () => {
   });
 
   it('uses §8’s header', () => {
-    expect(headerLabel(126)).toBe('We found 126 pieces 👀');
-    expect(headerLabel(1)).toBe('We found 1 piece 👀');
+    expect(headerLabel(126)).toBe('We found 126 pieces');
+    expect(headerLabel(1)).toBe('We found 1 piece');
   });
 
   it('does not say it found nothing with an emoji', () => {

@@ -1,5 +1,6 @@
 import { memo, useCallback } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Text } from '@/ui/Text';
 import { color, radius, space, type } from '@mira/ui';
 
 /**
@@ -79,11 +80,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: color.border,
   },
-  chipActive: { backgroundColor: color.accentSoft, borderColor: color.accentSoft },
+  chipActive: { backgroundColor: color.accent, borderColor: color.accent },
   chipLabel: {
     fontSize: type.subhead.fontSize,
     lineHeight: type.subhead.lineHeight,
     color: color.textSecondary,
   },
-  chipLabelActive: { color: color.text, fontWeight: type.bodyStrong.fontWeight },
+  chipLabelActive: { color: color.inverseText, fontWeight: type.bodyStrong.fontWeight },
 });

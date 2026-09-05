@@ -219,6 +219,34 @@ export function hexToRgb(hex: string): Rgb {
 const GROUND: Rgb = { r: 0xf5, g: 0xf3, b: 0xf0 };
 
 const clamp255 = (v: number) => (v < 0 ? 0 : v > 255 ? 255 : Math.round(v));
+
+/**
+ * Where the silhouettes actually sit in their own coordinate space.
+ *
+ * Every shape below is authored between these bounds, which leaves a quarter of
+ * the frame empty above the garment and none below it. Rendered straight, a
+ * closet of them reads as a grid of small objects floating high in grey boxes —
+ * the opposite of the fashion-first hierarchy the tiles are built for.
+ */
+const GARMENT_TOP = 0.26;
+const GARMENT_BOTTOM = 0.9;
+
+/**
+ * Recentre the garment in the frame, and zoom slightly.
+ *
+ * The zoom is deliberately small. The widest silhouette (a jacket's shoulders)
+ * already spans 84% of the frame, so anything past about 1.1 crops sleeves —
+ * and a cropped garment is a worse placeholder than a small one.
+ */
+const FRAME_ZOOM = 1.09;
+const GARMENT_CENTRE = (GARMENT_TOP + GARMENT_BOTTOM) / 2;
+
+function framed(nx: number, ny: number): { x: number; y: number } {
+  return {
+    x: 0.5 + (nx - 0.5) / FRAME_ZOOM,
+    y: GARMENT_CENTRE + (ny - 0.5) / FRAME_ZOOM,
+  };
+}
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /**
@@ -257,7 +285,8 @@ export function renderGarmentImage(options: {
         for (let sx = 0; sx < SS; sx += 1) {
           const nx = (x + (sx + 0.5) / SS) / width;
           const ny = (y + (sy + 0.5) / SS) / height;
-          if (shape(nx, ny)) covered += 1;
+          const p = framed(nx, ny);
+          if (shape(p.x, p.y)) covered += 1;
         }
       }
       const coverage = covered / (SS * SS);

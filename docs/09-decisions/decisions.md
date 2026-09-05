@@ -629,3 +629,54 @@ Format:
   emits it does not exist". 11.3 must not learn from that difference. Wears
   count garment events only: an outfit wear also writes one row per garment, and
   counting both would double every look someone wore.
+
+## D-035 — Mira has no accent hue
+
+- **Date:** 2026-09-05 · **Status:** Accepted
+- **Decision:** `color.accent` is ink (`#171717`), not dusty rose. Selected
+  chips are an ink fill with an inverse label; the filled favourite heart and
+  the active tab are ink. `accentSoft` becomes a warm neutral (`#EFEBE6`) for
+  selections that must stay quiet. The token keeps its name.
+- **Why:** rose was the only colour in the entire interface, and it landed on
+  exactly the elements the eye reaches first — the selected category, the
+  selected Looks filter, the favourite heart. `design-system.md` §2 already
+  asked the app never to look "covered in pink" and it succeeded; a single rose
+  accent is still a gendered signal, just a quiet one. The owner asked for a
+  unisex reading with Zara as the reference, and Zara's palette carries no
+  accent at all. This also strengthens the rule the document already states:
+  the clothes supply the colour, the UI supplies the calm. With no hue in the
+  chrome, that is now literally true rather than nearly true.
+- **Consequences:** the token is kept rather than deleted, because it carries a
+  *meaning* — chosen, loved — that `text` does not, and keeping it makes a
+  future accent one line instead of a hunt through nine components. The dark
+  palette can no longer spread `accent` unchanged: ink on a near-black ground
+  would make the selected chip vanish, so it tracks `text` in both sets and a
+  test asserts the contrast. The contrast suite previously pinned rose as
+  *below* AA to document "fills and icons only"; that assertion is gone and an
+  ink/inverse pair held to AAA replaced it. Applied-filter chips deliberately
+  keep the soft fill: five ink pills in a row turn the top of the closet into a
+  black bar and make removing a filter look like the primary action.
+
+## D-036 — Archivo, bundled, everywhere
+
+- **Date:** 2026-09-05 · **Status:** Accepted
+- **Decision:** Mira ships Archivo at weights 400/500/600/700, bundled with the
+  app. It replaces the system sans everywhere; there is no separate editorial
+  face. `Text` and `TextInput` wrappers resolve `fontWeight` to a family.
+- **Why:** there was no typeface at all — no `assets/fonts`, no `fontFamily`
+  anywhere — so a premium fashion app was rendering in the same face as the
+  Settings app. §3 permitted "a slightly more fashion-forward face" for
+  headings; a second face is a second identity, and one grotesque used with
+  discipline says more than a display face used occasionally. Bundled rather
+  than fetched because Mira is usable offline, and type that arrives a second
+  late is worse than type that never changes.
+- **Consequences:** the wrappers exist because of one iOS behaviour that fails
+  *silently*: once `fontFamily` names a custom face, `fontWeight` selects
+  nothing, so every heading in the app would render as body copy with no error,
+  no failing test and no lint warning. Resolving the weight centrally means
+  feature code still writes `fontWeight` and never learns a face name, which
+  keeps §10 true. `no-restricted-imports` makes importing react-native's `Text`
+  an error, because a single missed import is an invisible regression. The root
+  layout holds the first frame until the faces are registered — safe only
+  because they are in the bundle — rather than rendering in the system face and
+  reflowing.

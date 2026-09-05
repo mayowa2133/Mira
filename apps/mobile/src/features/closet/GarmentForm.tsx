@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/ui/Text';
 import { CATEGORIES, OCCASIONS, PATTERNS, SEASONS, STYLE_TAGS } from '@mira/taxonomy';
 import { color, space, type } from '@mira/ui';
 import { ApiError } from '@/lib/api';

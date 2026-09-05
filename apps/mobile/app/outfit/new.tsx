@@ -1,22 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text, TextInput } from '@/ui/Text';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
-import {
-  SLOT_ORDER,
-  conflictsFor,
-  missingSlots,
-  type OutfitSlot,
-} from '@mira/taxonomy';
+import { Icon } from '@/ui/Icon';
+import { SLOT_ORDER, conflictsFor, missingSlots, type OutfitSlot } from '@mira/taxonomy';
 import { ClosetGridSkeleton, ClosetState } from '@/features/closet/ClosetGrid';
 import { imageSrc, useGarments } from '@/features/closet/queries';
 import { useCreateOutfit } from '@/features/outfits/queries';
@@ -138,17 +128,25 @@ export default function OutfitBuilderScreen() {
               accessibilityLabel={`${entry.label}, in this look. Double tap to remove.`}
             >
               {entry.image ? (
-                <Image style={styles.pickedImage} source={{ uri: entry.image }} accessible={false} />
+                <Image
+                  style={styles.pickedImage}
+                  source={{ uri: entry.image }}
+                  accessible={false}
+                />
               ) : (
                 <View style={[styles.pickedImage, styles.pickedEmpty]} />
               )}
-              <Text style={styles.pickedRemove}>✕</Text>
+              <Icon name="close" size={14} color={color.textSecondary} />
             </Pressable>
           ))}
         </ScrollView>
       ) : null}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.slotRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.slotRow}
+      >
         {SLOT_ORDER.map((entry) => {
           const active = entry === slot;
           const filled = slots.includes(entry);
@@ -308,9 +306,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: color.border,
   },
-  slotChipActive: { backgroundColor: color.accentSoft, borderColor: color.accentSoft },
+  slotChipActive: { backgroundColor: color.accent, borderColor: color.accent },
   slotLabel: { fontSize: type.subhead.fontSize, color: color.textSecondary },
-  slotLabelActive: { color: color.text },
+  slotLabelActive: { color: color.inverseText },
 
   note: {
     paddingHorizontal: space.screenX,

@@ -1,5 +1,12 @@
 import { useState } from 'react';
 import { Stack } from 'expo-router';
+import { useFonts } from 'expo-font';
+import {
+  Archivo_400Regular,
+  Archivo_500Medium,
+  Archivo_600SemiBold,
+  Archivo_700Bold,
+} from '@expo-google-fonts/archivo';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -26,6 +33,16 @@ bootstrapDevAuth();
  * the detail screen pops back to the closet, and the undo must still be there.
  */
 export default function RootLayout() {
+  // Bundled, not fetched (D-036) — so this resolves on the first frame offline
+  // as well as on. `error` is deliberately not a failure path: a missing face
+  // means the system font, which is a worse-looking app, not a broken one.
+  const [fontsReady, fontError] = useFonts({
+    Archivo_400Regular,
+    Archivo_500Medium,
+    Archivo_600SemiBold,
+    Archivo_700Bold,
+  });
+
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -44,6 +61,11 @@ export default function RootLayout() {
         },
       }),
   );
+
+  // Nothing is rendered in the system face first and then reflowed into
+  // Archivo: a visible type swap on launch is the cheapest possible way to look
+  // unfinished. Holding is safe because the files are in the bundle.
+  if (!fontsReady && !fontError) return null;
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -108,7 +108,30 @@ export default tseslint.config(
             'No literal rgb/rgba colours in feature code. Import a token from @mira/ui (docs/02-design/design-system.md §10).',
         },
       ],
+      // Custom faces and `fontWeight` do not combine on iOS: once fontFamily
+      // names Archivo, asking for weight 600 silently renders Regular. The
+      // wrapper in src/ui/Text.tsx resolves the weight to a family, so every
+      // heading in the app depends on nobody importing the raw component.
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'react-native',
+              importNames: ['Text', 'TextInput'],
+              message:
+                "Import Text and TextInput from '@/ui/Text' — react-native's ignore fontWeight once a custom font is set (docs/02-design/design-system.md §3).",
+            },
+          ],
+        },
+      ],
     },
+  },
+
+  // The wrapper is the one place the raw components may be imported.
+  {
+    files: ['apps/mobile/src/ui/Text.tsx'],
+    rules: { 'no-restricted-imports': 'off' },
   },
 
   // Tokens and contrast maths are the one place literal colours belong.

@@ -52,9 +52,9 @@ Warm, brief, second person, lowercase-friendly. "You haven't worn this in
 | `color.text` | `#171717` | Near-black. Primary text. |
 | `color.textSecondary` | `#76726E` | Warm grey. Secondary text, metadata. |
 | `color.textTertiary` | `#A8A29C` | Hints, disabled, timestamps. |
-| `color.accent` | `#C98F8A` | Dusty rose. Mira's accent — used sparingly. |
-| `color.accentSoft` | `#F3E7E4` | Pale blush. Selected chips, soft backgrounds. |
-| `color.accentPressed` | `#B87C77` | Accent pressed state. |
+| `color.accent` | `#171717` | Ink. Selected chips, the filled heart, the active tab. |
+| `color.accentSoft` | `#EFEBE6` | Warm neutral. Applied-filter chips and other quiet selections. |
+| `color.accentPressed` | `#33302D` | Accent pressed state. |
 | `color.success` | `#7D8F7B` | Muted sage. Confirmations. |
 | `color.successSoft` | `#EAEFE8` | Success backgrounds. |
 | `color.warning` | `#C7994F` | Muted amber. Needs-review states. |
@@ -70,13 +70,20 @@ Warm, brief, second person, lowercase-friendly. "You haven't worn this in
 
 ### Rules
 
-1. **Accent is punctuation, not paint.** Dusty rose appears on selection,
-   favourites and the Mira tab — not on every button.
-2. **Primary button is near-black with white text.** Not rose.
-3. The app must never look "covered in pink."
+1. **There is no accent hue.** The chrome is ivory, ink and warm grey. Selection
+   and affection are marked with ink, not with a tint (D-035). `color.accent`
+   remains a separate token because it carries a different *meaning* — chosen,
+   loved — and keeping the name is what makes a future accent one line rather
+   than a hunt through components.
+2. **Primary button is near-black with white text.**
+3. The only colour on any screen is the clothing. If a screen looks colourless
+   with garments on it, the garments are the bug.
 4. Colour filter swatches use true garment colours from the taxonomy palette, not
    brand colours.
 5. Every colour that carries meaning also carries text or an icon (A11Y-4).
+6. A quiet selection may use `accentSoft` rather than a full ink fill — applied
+   filter chips do, because five ink pills in a row turn the top of the closet
+   into a black bar and make *removing* a filter look like the primary action.
 
 ### Camera and pending surfaces
 
@@ -109,16 +116,27 @@ photo exists; veiling it into abstraction would defeat that.
 
 V1 ships light only. The token set is authored so dark mode is a token swap:
 `bg #141312`, `surface #1E1C1A`, `text #F5F3F0`, `textSecondary #A29D97`,
-`divider #2B2825`, accent unchanged. Do not hard-code hex values in components —
-always read tokens, so this remains a one-file change.
+`divider #2B2825`. Now that the accent is ink, it has to invert with the text it
+matches — a near-black selected chip on a near-black ground is invisible — so
+`accent` and `accentSoft` move in the dark set rather than staying put. Do not
+hard-code hex values in components; always read tokens, so this remains a
+one-file change.
 
 ---
 
 ## 3. Typography
 
-UI type is the system sans (SF Pro on iOS, Inter as the cross-platform fallback).
-Editorial headings may use a slightly more fashion-forward face; if unavailable,
-system sans at heavier tracking is an acceptable substitute.
+UI type is **Archivo**, a grotesque, bundled with the app rather than fetched
+(D-036). It is used everywhere — there is no separate editorial face, because a
+second face is a second identity and Mira only needs one.
+
+Faces are bundled at 400, 500, 600 and 700.
+
+> **Implementation.** On iOS `fontWeight` selects nothing once `fontFamily` names
+> a custom face — Archivo at weight 600 renders Archivo Regular, silently. The
+> `Text` and `TextInput` wrappers in `apps/mobile/src/ui/Text.tsx` resolve a
+> weight to a family, so feature code keeps writing `fontWeight` and never names
+> a face. Importing the react-native components directly is an ESLint error.
 
 | Token | Size / Line | Weight | Tracking | Use |
 | ----- | ----------- | ------ | -------- | --- |
@@ -137,6 +155,8 @@ system sans at heavier tracking is an acceptable substitute.
 **Rules**
 
 - At most two type sizes on a garment card.
+- Never name a font family in a component. Set `fontWeight`; the wrapper resolves
+  it.
 - Brand name above product name, uppercase, `type.brand`, `textSecondary`.
 - Never centre-align body copy.
 - All sizes scale with Dynamic Type (A11Y-3).
@@ -202,8 +222,9 @@ Pressed state: 0.96 scale + 8% opacity drop. Never a colour flash.
 
 Height 36, `radius.full`, `space` 12 horizontal padding.
 - **Unselected:** `surface` fill, 1px `border`, `textSecondary`.
-- **Selected:** `accentSoft` fill, no border, `text`.
-- **Dismissible (applied filter):** selected style plus a trailing ✕.
+- **Selected:** `accent` (ink) fill, no border, `inverseText`.
+- **Dismissible (applied filter):** `accentSoft` fill, `text`, plus a trailing
+  `close` icon. Quieter than a primary selection on purpose — see §2 rule 6.
 
 ### Garment tile
 
@@ -241,6 +262,17 @@ Height 52, `surface`, 1px `border`, `radius.md`, 16px padding. Search inputs are
 
 Thin line icons, 1.5px stroke, 24×24 default. No filled icons except the
 favourite heart in its active state and the active tab indicator.
+
+Drawn in `apps/mobile/src/ui/Icon.tsx`, not taken from an icon library: every
+general set carries a house accent — Material reads Android, SF Symbols read
+iOS system app — and the closet grid is the surface where the chrome has to
+disappear behind the clothing. Three glyphs (`hanger`, `looks`, `mira`) have no
+equivalent in a general set anyway.
+
+**Never an emoji.** An emoji renders in whatever face the OS picks, at whatever
+weight, in whatever palette — the one thing an icon must not do. Emoji stood in
+for the icon set on onboarding, the Add sheet and two section headings, and it
+was the loudest unfinished signal in the app.
 
 ---
 

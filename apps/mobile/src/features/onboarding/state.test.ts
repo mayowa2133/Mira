@@ -80,7 +80,7 @@ describe('the copy the spec fixes', () => {
     // A route with no destination must say it is coming rather than look
     // broken (CAP-4: every path degrades rather than dead-ends).
     for (const route of CLOSET_ROUTES) {
-      if (route.to === null) expect(route.phase).not.toBeNull();
+      if (route.to === null) expect(route.status).not.toBeNull();
     }
   });
 });

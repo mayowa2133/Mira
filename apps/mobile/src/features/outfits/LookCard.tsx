@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/ui/Text';
 import { Image } from 'expo-image';
 import { color, radius, space, type } from '@mira/ui';
 import { compareSlots, type OutfitSlot } from '@mira/taxonomy';
@@ -69,16 +70,18 @@ export function LookCard({ outfit, onPress }: LookCardProps) {
         {pieces.length === 0 ? (
           <View style={styles.empty} />
         ) : (
-          pieces.slice(0, 4).map((piece) => (
-            <Image
-              key={piece.garment_id}
-              style={[styles.piece, tileSize(Math.min(pieces.length, 4))]}
-              source={{ uri: piece.image_url as string }}
-              contentFit="cover"
-              transition={140}
-              accessible={false}
-            />
-          ))
+          pieces
+            .slice(0, 4)
+            .map((piece) => (
+              <Image
+                key={piece.garment_id}
+                style={[styles.piece, tileSize(Math.min(pieces.length, 4))]}
+                source={{ uri: piece.image_url as string }}
+                contentFit="cover"
+                transition={140}
+                accessible={false}
+              />
+            ))
         )}
       </View>
 

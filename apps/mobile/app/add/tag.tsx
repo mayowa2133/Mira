@@ -1,9 +1,11 @@
 import { useCallback, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/ui/Text';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
+import { Icon } from '@/ui/Icon';
 
 /**
  * Scan tag (§10, task 4.1).
@@ -83,7 +85,7 @@ export default function ScanTagScreen() {
           accessibilityRole="button"
           accessibilityLabel="Close"
         >
-          <Text style={styles.close}>✕</Text>
+          <Icon name="close" size={22} color={color.text} />
         </Pressable>
       </View>
 

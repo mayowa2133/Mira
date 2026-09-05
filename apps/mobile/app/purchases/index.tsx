@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/ui/Text';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -291,9 +292,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: color.divider,
   },
-  chipActive: { backgroundColor: color.accentSoft, borderColor: color.accentSoft },
+  chipActive: { backgroundColor: color.accent, borderColor: color.accent },
   chipLabel: { fontSize: type.subhead.fontSize, color: color.textSecondary },
-  chipLabelActive: { color: color.text },
+  chipLabelActive: { color: color.inverseText },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
   cell: { width: '47%' },

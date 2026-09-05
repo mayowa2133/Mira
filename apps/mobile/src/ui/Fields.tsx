@@ -1,5 +1,6 @@
 import { memo, useCallback } from 'react';
-import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, View } from 'react-native';
+import { Text, TextInput } from '@/ui/Text';
 import { color, radius, space, type } from '@mira/ui';
 
 /**
@@ -307,9 +308,9 @@ const styles = StyleSheet.create({
     borderColor: color.border,
     backgroundColor: color.surface,
   },
-  chipActive: { backgroundColor: color.accentSoft, borderColor: color.accentSoft },
+  chipActive: { backgroundColor: color.accent, borderColor: color.accent },
   chipLabel: { fontSize: type.subhead.fontSize, color: color.textSecondary },
-  chipLabelActive: { color: color.text, fontWeight: type.bodyStrong.fontWeight },
+  chipLabelActive: { color: color.inverseText, fontWeight: type.bodyStrong.fontWeight },
 
   colorChip: {
     flexDirection: 'row',

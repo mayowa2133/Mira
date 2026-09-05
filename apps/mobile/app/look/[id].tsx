@@ -1,9 +1,11 @@
 import { useCallback } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/ui/Text';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
+import { Icon } from '@/ui/Icon';
 import { compareSlots, type OutfitSlot } from '@mira/taxonomy';
 import { ClosetGridSkeleton, ClosetState } from '@/features/closet/ClosetGrid';
 import { useSnackbar } from '@/ui/Snackbar';
@@ -99,16 +101,18 @@ export default function LookDetailScreen() {
           {withImages.length === 0 ? (
             <View style={styles.heroEmpty} />
           ) : (
-            withImages.slice(0, 4).map((piece) => (
-              <Image
-                key={piece.garment_id}
-                style={[styles.heroPiece, withImages.length === 1 && styles.heroSingle]}
-                source={{ uri: piece.image_url as string }}
-                contentFit="cover"
-                transition={160}
-                accessible={false}
-              />
-            ))
+            withImages
+              .slice(0, 4)
+              .map((piece) => (
+                <Image
+                  key={piece.garment_id}
+                  style={[styles.heroPiece, withImages.length === 1 && styles.heroSingle]}
+                  source={{ uri: piece.image_url as string }}
+                  contentFit="cover"
+                  transition={160}
+                  accessible={false}
+                />
+              ))
           )}
 
           <Pressable
@@ -145,9 +149,12 @@ export default function LookDetailScreen() {
             accessibilityState={{ checked: look.favorite }}
             accessibilityLabel={look.favorite ? 'Remove from saved' : 'Save this look'}
           >
-            <Text style={[styles.heartGlyph, look.favorite && styles.heartOn]}>
-              {look.favorite ? '♥' : '♡'}
-            </Text>
+            <Icon
+              name="heart"
+              size={24}
+              filled={look.favorite}
+              color={look.favorite ? color.accent : color.text}
+            />
           </Pressable>
         </View>
 
@@ -158,9 +165,7 @@ export default function LookDetailScreen() {
             style={styles.pieceRow}
             onPress={() => router.push(`/garment/${piece.garment_id}`)}
             accessibilityRole="button"
-            accessibilityLabel={[piece.brand, piece.name, piece.slot]
-              .filter(Boolean)
-              .join(', ')}
+            accessibilityLabel={[piece.brand, piece.name, piece.slot].filter(Boolean).join(', ')}
           >
             {piece.image_url ? (
               <Image
@@ -174,7 +179,9 @@ export default function LookDetailScreen() {
             )}
 
             <View style={styles.pieceText}>
-              {piece.brand ? <Text style={styles.pieceBrand}>{piece.brand.toUpperCase()}</Text> : null}
+              {piece.brand ? (
+                <Text style={styles.pieceBrand}>{piece.brand.toUpperCase()}</Text>
+              ) : null}
               <Text style={styles.pieceName} numberOfLines={1}>
                 {piece.name ?? piece.category ?? 'Piece'}
               </Text>

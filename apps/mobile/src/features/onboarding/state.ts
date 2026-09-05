@@ -71,41 +71,48 @@ export const VALUE_CARDS = [
  * §5's four routes into a closet, in the spec's order.
  *
  * Email is first, and the screen gives it visual priority, because it has the
- * highest item-per-action yield. A route with no destination yet names the
- * phase that brings it, so the screen can show it as coming rather than as
- * broken (CAP-4).
+ * highest item-per-action yield. A route with no destination yet says it is
+ * coming, so the screen shows it as pending rather than as broken (CAP-4).
+ *
+ * `icon` names a glyph in `src/ui/Icon.tsx`. These were emoji — on the first
+ * screen a new user sees, which is the worst possible place to look like a
+ * placeholder, and which rendered in whatever face the OS chose rather than in
+ * Mira's.
  */
+/** The only thing Mira says about a route it has not built. */
+const COMING = 'Coming soon';
+
 export const CLOSET_ROUTES = [
   {
     key: 'email',
-    icon: '✉️',
+    icon: 'mail' as const,
     title: 'Find online purchases',
     body: 'Connect email and find clothes you already bought',
     to: null as string | null,
-    phase: 'Phase 8' as string | null,
+    status: COMING as string | null,
   },
   {
     key: 'receipts',
-    icon: '🧾',
+    icon: 'receipt' as const,
     title: 'Scan receipts',
     body: null,
     to: null as string | null,
-    phase: 'Phase 4' as string | null,
+    status: COMING as string | null,
   },
   {
     key: 'clothes',
-    icon: '📸',
+    icon: 'camera' as const,
     title: 'Scan clothes',
     body: null,
     to: '/add/scan' as string | null,
-    phase: null as string | null,
+    status: null as string | null,
   },
   {
     key: 'tags',
-    icon: '🏷',
+    icon: 'tag' as const,
     title: 'Scan tags',
     body: null,
     to: null as string | null,
-    phase: 'Phase 4' as string | null,
+    status: COMING as string | null,
   },
 ] as const;

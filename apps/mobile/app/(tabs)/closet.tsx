@@ -1,8 +1,10 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/ui/Text';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
+import { Icon } from '@/ui/Icon';
 import { ClosetGrid } from '@/features/closet/ClosetGrid';
 import { CategoryChips } from '@/features/closet/CategoryChips';
 import { FilterSheet } from '@/features/closet/FilterSheet';
@@ -16,11 +18,7 @@ import {
 } from '@/features/closet/filter-state';
 import { useClosetSummary, useGarments, useToggleFavorite } from '@/features/closet/queries';
 import { PendingTile } from '@/features/capture/PendingTile';
-import {
-  discardFailedCapture,
-  retryCapture,
-  usePendingCaptures,
-} from '@/features/capture/queue';
+import { discardFailedCapture, retryCapture, usePendingCaptures } from '@/features/capture/queue';
 
 /**
  * Closet (`docs/02-design/screen-specs.md` §14).
@@ -61,11 +59,7 @@ export default function ClosetScreen() {
       <View style={styles.pendingRow}>
         {captures.map((entry) => (
           <View key={entry.id} style={styles.pendingCell}>
-            <PendingTile
-              entry={entry}
-              onRetry={retryCapture}
-              onDiscard={discardFailedCapture}
-            />
+            <PendingTile entry={entry} onRetry={retryCapture} onDiscard={discardFailedCapture} />
           </View>
         ))}
       </View>
@@ -137,6 +131,7 @@ export default function ClosetScreen() {
             activeCount > 0 ? `Filter, ${activeCount} applied` : 'Filter your closet'
           }
         >
+          <Icon name="filter" size={18} color={color.text} />
           <Text style={styles.controlLabel}>
             Filter{activeCount > 0 ? ` · ${activeCount}` : ''}
           </Text>
@@ -158,7 +153,7 @@ export default function ClosetScreen() {
               accessibilityLabel={`${chip.label}, applied filter. Double tap to remove.`}
             >
               <Text style={styles.appliedChipLabel}>{chip.label}</Text>
-              <Text style={styles.appliedChipRemove}>✕</Text>
+              <Icon name="close" size={14} color={color.textSecondary} />
             </Pressable>
           ))}
         </ScrollView>
@@ -224,7 +219,17 @@ const styles = StyleSheet.create({
   },
 
   controls: { flexDirection: 'row', paddingTop: space.sm },
-  control: { minHeight: space.tapMin, justifyContent: 'center', paddingRight: space.lg },
+  control: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    minHeight: 36,
+    paddingHorizontal: space.md,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: color.border,
+    backgroundColor: color.surface,
+  },
   controlLabel: {
     fontSize: type.subhead.fontSize,
     fontWeight: type.bodyStrong.fontWeight,

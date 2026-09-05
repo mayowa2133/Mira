@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text, TextInput } from '@/ui/Text';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
@@ -94,7 +95,7 @@ export default function BodyProfileScreen() {
             <Text style={styles.slotLabel}>{slot.label}</Text>
             <Text style={styles.slotMeta}>{slot.required ? 'Required' : 'Optional'}</Text>
           </View>
-          <Text style={styles.slotPending}>Phase 10</Text>
+          <Text style={styles.slotPending}>Coming soon</Text>
         </View>
       ))}
 

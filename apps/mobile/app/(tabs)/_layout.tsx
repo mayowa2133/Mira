@@ -38,35 +38,45 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color: tint }) => <TabIcon name="home" tint={tint} />,
+          tabBarIcon: ({ color: tint, focused }) => (
+            <TabIcon name="home" tint={tint} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="closet"
         options={{
           title: 'Closet',
-          tabBarIcon: ({ color: tint }) => <TabIcon name="closet" tint={tint} />,
+          tabBarIcon: ({ color: tint, focused }) => (
+            <TabIcon name="closet" tint={tint} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="mira"
         options={{
           title: 'MIRA',
-          tabBarIcon: ({ color: tint }) => <TabIcon name="mira" tint={tint} />,
+          tabBarIcon: ({ color: tint, focused }) => (
+            <TabIcon name="mira" tint={tint} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="looks"
         options={{
           title: 'Looks',
-          tabBarIcon: ({ color: tint }) => <TabIcon name="looks" tint={tint} />,
+          tabBarIcon: ({ color: tint, focused }) => (
+            <TabIcon name="looks" tint={tint} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="you"
         options={{
           title: 'You',
-          tabBarIcon: ({ color: tint }) => <TabIcon name="you" tint={tint} />,
+          tabBarIcon: ({ color: tint, focused }) => (
+            <TabIcon name="you" tint={tint} focused={focused} />
+          ),
         }}
       />
     </Tabs>

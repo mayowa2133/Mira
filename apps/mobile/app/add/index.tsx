@@ -1,7 +1,9 @@
-import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Text } from '@/ui/Text';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
+import { Icon, type IconName } from '@/ui/Icon';
 
 /**
  * Add to your closet (`docs/02-design/screen-specs.md` §18).
@@ -16,15 +18,21 @@ import { color, radius, space, type } from '@mira/ui';
 /**
  * The other ways in.
  *
- * `to` is set once a route exists; `phase` names what is still coming. A row
- * that opens nothing and explains nothing reads as broken (CAP-4).
+ * `to` is set once a route exists; `status` says what is still coming, in words
+ * a user can act on. A row that opens nothing and explains nothing reads as
+ * broken (CAP-4).
  */
-const OPTIONS: { icon: string; label: string; phase: string | null; to: string | null }[] = [
-  { icon: '🏷', label: 'Scan a tag', phase: null, to: '/add/tag' },
-  { icon: '🧾', label: 'Scan a receipt', phase: null, to: '/add/receipt' },
+const OPTIONS: {
+  icon: IconName;
+  label: string;
+  status: string | null;
+  to: string | null;
+}[] = [
+  { icon: 'tag', label: 'Scan a tag', status: null, to: '/add/tag' },
+  { icon: 'receipt', label: 'Scan a receipt', status: null, to: '/add/receipt' },
   // The review screen exists; what fills it does not, and it says so.
-  { icon: '✉️', label: 'Review purchases', phase: null, to: '/purchases' },
-  { icon: '🔗', label: 'Paste product link', phase: 'Phase 3', to: null },
+  { icon: 'mail', label: 'Review purchases', status: null, to: '/purchases' },
+  { icon: 'link', label: 'Paste product link', status: 'Coming soon', to: null },
 ];
 
 export default function AddScreen() {
@@ -46,7 +54,9 @@ export default function AddScreen() {
         accessibilityRole="button"
         accessibilityLabel="Scan an item. Photograph something you already own."
       >
-        <Text style={styles.primaryIcon}>📸</Text>
+        <View style={styles.primaryIcon}>
+          <Icon name="camera" size={28} color={color.text} />
+        </View>
         <Text style={styles.primaryLabel}>Scan an item</Text>
         <Text style={styles.primaryHint}>Photograph something you already own</Text>
       </Pressable>
@@ -59,9 +69,11 @@ export default function AddScreen() {
         accessibilityRole="button"
         accessibilityLabel="Choose a photo"
       >
-        <Text style={styles.rowIcon}>🖼</Text>
+        <View style={styles.rowIcon}>
+          <Icon name="image" size={22} color={color.text} />
+        </View>
         <Text style={styles.rowLabel}>Choose a photo</Text>
-        <Text style={styles.rowChevron}>›</Text>
+        <Icon name="chevronRight" size={18} color={color.textTertiary} />
       </Pressable>
 
       {OPTIONS.map((option) => (
@@ -71,14 +83,20 @@ export default function AddScreen() {
           disabled={!option.to}
           onPress={() => option.to && router.push(option.to as never)}
           accessibilityRole="button"
-          accessibilityLabel={option.phase ? `${option.label}, ${option.phase}` : option.label}
+          accessibilityLabel={option.status ? `${option.label}, ${option.status}` : option.label}
           testID={`add-${option.label.split(' ')[0]?.toLowerCase()}`}
         >
-          <Text style={styles.rowIcon}>{option.icon}</Text>
+          <View style={styles.rowIcon}>
+            <Icon name={option.icon} size={22} color={option.to ? color.text : color.textTertiary} />
+          </View>
           <Text style={[styles.rowLabel, !option.to && styles.rowLabelPending]}>
             {option.label}
           </Text>
-          <Text style={styles.rowPending}>{option.phase ?? '›'}</Text>
+          {option.status ? (
+            <Text style={styles.rowPending}>{option.status}</Text>
+          ) : (
+            <Icon name="chevronRight" size={18} color={color.textTertiary} />
+          )}
         </Pressable>
       ))}
 
@@ -90,9 +108,11 @@ export default function AddScreen() {
         accessibilityRole="button"
         accessibilityLabel="Add manually"
       >
-        <Text style={styles.rowIcon}>✎</Text>
+        <View style={styles.rowIcon}>
+          <Icon name="pencil" size={22} color={color.text} />
+        </View>
         <Text style={styles.rowLabel}>Add manually</Text>
-        <Text style={styles.rowChevron}>›</Text>
+        <Icon name="chevronRight" size={18} color={color.textTertiary} />
       </Pressable>
     </ScrollView>
   );
@@ -117,7 +137,7 @@ const styles = StyleSheet.create({
     borderColor: color.divider,
     marginBottom: space.xl,
   },
-  primaryIcon: { fontSize: 28 },
+  primaryIcon: { marginBottom: space.xs },
   primaryLabel: {
     marginTop: space.md,
     fontSize: type.title3.fontSize,
@@ -137,9 +157,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: color.divider,
   },
-  rowIcon: { width: space.xxxl, fontSize: 18 },
+  rowIcon: { width: space.xxxl },
   rowLabel: { flex: 1, fontSize: type.body.fontSize, color: color.text },
   rowLabelPending: { color: color.textSecondary },
   rowPending: { fontSize: type.caption.fontSize, color: color.textTertiary },
-  rowChevron: { fontSize: 20, color: color.textSecondary },
 });

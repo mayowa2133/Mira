@@ -13,6 +13,10 @@ describe('colour contrast (A11Y-2)', () => {
     ['text on surfaceSunken', color.text, color.surfaceSunken, AAA_NORMAL],
     ['text on accentSoft', color.text, color.accentSoft, AAA_NORMAL],
     ['inverseText on inverseBg', color.inverseText, color.inverseBg, AAA_NORMAL],
+    // The selected chip is an ink fill with an inverse label (D-035). It is the
+    // most-read selected state in the app — every category, filter and tab
+    // uses it — so it is held to AAA like body text, not to AA.
+    ['inverseText on accent', color.inverseText, color.accent, AAA_NORMAL],
   ])('%s meets AAA', (_label, fg, bg, min) => {
     expect(contrastRatio(fg, bg)).toBeGreaterThanOrEqual(min);
   });
@@ -35,8 +39,11 @@ describe('colour contrast (A11Y-2)', () => {
     // Documented as fills/icons only. The assertion pins the reason: if someone
     // later "fixes" these to pass AA, the design intent has changed and this
     // test should be updated deliberately.
+    //
+    // `accent` used to be in this list. It left deliberately: it is ink now
+    // (D-035), so it is legible on a light ground by construction — and the
+    // constraint that replaced this one is the ink/inverse pair asserted above.
     it.each([
-      ['accent', color.accent],
       ['success', color.success],
       ['warning', color.warning],
       ['textTertiary', color.textTertiary],
@@ -45,10 +52,27 @@ describe('colour contrast (A11Y-2)', () => {
     });
   });
 
+  it('carries no accent hue at all, so the chrome reads the same to everyone', () => {
+    // D-035. The only colour on any screen is the clothing. A future accent is
+    // a deliberate product decision, and this test is where it announces
+    // itself rather than arriving as a styling tweak.
+    expect(color.accent).toBe(color.text);
+  });
+
   it('meets AA in the dark palette too, so the swap stays honest', () => {
     expect(contrastRatio(colorDark.text, colorDark.bg)).toBeGreaterThanOrEqual(AAA_NORMAL);
     expect(contrastRatio(colorDark.text, colorDark.surface)).toBeGreaterThanOrEqual(AAA_NORMAL);
     expect(contrastRatio(colorDark.textSecondary, colorDark.bg)).toBeGreaterThanOrEqual(AA_LARGE);
+  });
+
+  it('keeps the selected chip visible in the dark palette', () => {
+    // The accent is ink, which is the same value as `text`. Spread into the
+    // dark set unchanged it would be a near-black fill on a near-black ground:
+    // the selected category would vanish, and nothing else would fail.
+    expect(contrastRatio(colorDark.accent, colorDark.bg)).toBeGreaterThanOrEqual(AA_LARGE);
+    expect(contrastRatio(colorDark.inverseText, colorDark.accent)).toBeGreaterThanOrEqual(
+      AAA_NORMAL,
+    );
   });
 });
 

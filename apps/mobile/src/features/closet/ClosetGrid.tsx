@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/ui/Text';
 import { FlashList } from '@shopify/flash-list';
 import { color, layout, radius, space, type } from '@mira/ui';
 import { ApiError } from '@/lib/api';

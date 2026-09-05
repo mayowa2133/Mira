@@ -12,21 +12,35 @@ export type ProfileRow = {
   label: string;
   /** Where it goes, or null while the surface does not exist. */
   to: string | null;
-  /** Named when `to` is null, so the row reads as coming rather than broken. */
-  phase: string | null;
+  /**
+   * Shown when `to` is null, so the row reads as coming rather than broken.
+   *
+   * User-facing words only. This field said "Phase 8" and "Q-08" on a screen
+   * real people look at — internal roadmap vocabulary that tells someone
+   * nothing except that they are reading a document meant for someone else.
+   */
+  status: string | null;
 };
 
+/**
+ * The only thing Mira says about a surface it has not built.
+ *
+ * Not a date and not a version: both are promises, and one of them will be
+ * wrong. "Coming soon" is what a person can act on — wait, or stop looking.
+ */
+const COMING = 'Coming soon';
+
 export const PROFILE_ROWS: readonly ProfileRow[] = [
-  { key: 'style', label: 'Style preferences', to: '/profile/style', phase: null },
-  { key: 'body', label: 'Body profile', to: '/body', phase: null },
-  { key: 'accounts', label: 'Connected accounts', to: null, phase: 'Phase 8' },
+  { key: 'style', label: 'Style preferences', to: '/profile/style', status: null },
+  { key: 'body', label: 'Body profile', to: '/body', status: null },
+  { key: 'accounts', label: 'Connected accounts', to: null, status: COMING },
   // The one row that must work now: privacy.md routes deletion and export
   // through it, and deletion is built.
-  { key: 'privacy', label: 'Privacy & data', to: '/profile/privacy', phase: null },
-  { key: 'notifications', label: 'Notifications', to: null, phase: 'Phase 8' },
-  { key: 'appearance', label: 'Appearance', to: null, phase: 'Q-08' },
-  { key: 'help', label: 'Help', to: null, phase: null },
-  { key: 'about', label: 'About Mira', to: null, phase: null },
+  { key: 'privacy', label: 'Privacy & data', to: '/profile/privacy', status: null },
+  { key: 'notifications', label: 'Notifications', to: null, status: COMING },
+  { key: 'appearance', label: 'Appearance', to: null, status: COMING },
+  { key: 'help', label: 'Help', to: null, status: null },
+  { key: 'about', label: 'About Mira', to: null, status: null },
 ];
 
 /**
@@ -52,21 +66,21 @@ export const PRIVACY_ACTIONS: readonly PrivacyAction[] = [
     label: 'Export my data',
     detail: 'A copy of your garments, outfits, wear history and images.',
     available: false,
-    blockedBy: 'Not built yet',
+    blockedBy: COMING,
   },
   {
     key: 'body-images',
     label: 'Delete body photos',
     detail: 'Removed immediately, along with every try-on made from them.',
     available: false,
-    blockedBy: 'Phase 10',
+    blockedBy: COMING,
   },
   {
     key: 'try-ons',
     label: 'Delete try-ons',
     detail: 'Removed immediately.',
     available: false,
-    blockedBy: 'Phase 10',
+    blockedBy: COMING,
   },
   {
     key: 'account',

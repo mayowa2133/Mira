@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/ui/Text';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -139,7 +140,7 @@ export default function HomeScreen() {
               <GarmentRail
                 key={insight.kind}
                 headline={
-                  insight.kind === 'forgotten' ? 'Rediscover your closet' : 'Still has tags 👀'
+                  insight.kind === 'forgotten' ? 'Rediscover your closet' : 'Still has tags'
                 }
                 caption={insight.kind === 'forgotten' ? insight.headline : undefined}
                 garments={insight.garments}

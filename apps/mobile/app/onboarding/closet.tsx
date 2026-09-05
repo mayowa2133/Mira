@@ -1,7 +1,9 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/ui/Text';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
+import { Icon } from '@/ui/Icon';
 import { CLOSET_ROUTES } from '@/features/onboarding/state';
 import { useSetOnboardingState } from '@/features/identity/queries';
 
@@ -15,9 +17,9 @@ import { useSetOnboardingState } from '@/features/identity/queries';
  * highest item-per-action yield, and someone with two hundred garments needs to
  * see that Mira is not asking them to photograph all of them.
  *
- * Three of the four routes are not built yet. They are shown, labelled with the
- * phase that brings them, rather than hidden — hiding them would make the
- * screen argue the opposite of its own point.
+ * Three of the four routes are not built yet. They are shown, labelled as
+ * coming, rather than hidden — hiding them would make the screen argue the
+ * opposite of its own point.
  */
 export default function BuildClosetScreen() {
   const router = useRouter();
@@ -53,10 +55,12 @@ export default function BuildClosetScreen() {
           accessibilityLabel={`${lead.title}. ${lead.body ?? ''}`}
           testID="onboarding-route-email"
         >
-          <Text style={styles.cardIcon}>{lead.icon}</Text>
+          <View style={styles.cardIcon}>
+            <Icon name={lead.icon} size={28} color={lead.to ? color.text : color.textSecondary} />
+          </View>
           <Text style={styles.cardTitle}>{lead.title}</Text>
           {lead.body ? <Text style={styles.cardBody}>{lead.body}</Text> : null}
-          {lead.phase ? <Text style={styles.pending}>{lead.phase}</Text> : null}
+          {lead.status ? <Text style={styles.pending}>{lead.status}</Text> : null}
         </Pressable>
 
         {rest.map((route) => (
@@ -69,11 +73,21 @@ export default function BuildClosetScreen() {
             accessibilityLabel={route.title}
             testID={`onboarding-route-${route.key}`}
           >
-            <Text style={styles.rowIcon}>{route.icon}</Text>
+            <View style={styles.rowIcon}>
+              <Icon
+                name={route.icon}
+                size={20}
+                color={route.to ? color.text : color.textTertiary}
+              />
+            </View>
             <Text style={[styles.rowLabel, !route.to && styles.rowLabelPending]}>
               {route.title}
             </Text>
-            <Text style={styles.pending}>{route.phase ?? '›'}</Text>
+            {route.status ? (
+              <Text style={styles.pending}>{route.status}</Text>
+            ) : (
+              <Icon name="chevronRight" size={18} color={color.textTertiary} />
+            )}
           </Pressable>
         ))}
       </ScrollView>
@@ -114,7 +128,7 @@ const styles = StyleSheet.create({
     marginBottom: space.md,
   },
   cardPending: { opacity: 0.7 },
-  cardIcon: { fontSize: 28 },
+  cardIcon: { marginBottom: space.sm },
   cardTitle: {
     marginTop: space.md,
     fontSize: type.title3.fontSize,
@@ -135,7 +149,7 @@ const styles = StyleSheet.create({
     minHeight: space.tapMin,
     paddingVertical: space.md,
   },
-  rowIcon: { fontSize: 20 },
+  rowIcon: { width: space.xxxl },
   rowLabel: { flex: 1, fontSize: type.body.fontSize, color: color.text },
   rowLabelPending: { color: color.textSecondary },
   pending: { marginTop: space.sm, fontSize: type.caption.fontSize, color: color.textTertiary },

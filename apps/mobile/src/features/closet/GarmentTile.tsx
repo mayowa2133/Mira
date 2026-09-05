@@ -1,7 +1,9 @@
 import { memo, useCallback } from 'react';
-import { Pressable, StyleSheet, Text, View, type AccessibilityActionEvent } from 'react-native';
+import { Pressable, StyleSheet, View, type AccessibilityActionEvent } from 'react-native';
+import { Text } from '@/ui/Text';
 import { Image } from 'expo-image';
 import { color, layout, radius, space, type } from '@mira/ui';
+import { Icon } from '@/ui/Icon';
 import { imageSrc, type Garment } from './queries';
 import { garmentLabel } from './garment-label';
 
@@ -120,9 +122,12 @@ function GarmentTileComponent({ garment, onPress, onToggleFavorite }: GarmentTil
           accessible={false}
           importantForAccessibility="no"
         >
-          <Text style={[styles.heart, garment.favorite && styles.heartOn]}>
-            {garment.favorite ? '♥' : '♡'}
-          </Text>
+          <Icon
+            name="heart"
+            size={22}
+            filled={garment.favorite}
+            color={garment.favorite ? color.accent : color.surface}
+          />
         </Pressable>
       </View>
 

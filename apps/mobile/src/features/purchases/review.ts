@@ -42,7 +42,7 @@ export function footerLabel(selected: number): string {
 /** §8's header. */
 export function headerLabel(total: number): string {
   if (total === 0) return 'Nothing to review';
-  return `We found ${total} ${total === 1 ? 'piece' : 'pieces'} 👀`;
+  return `We found ${total} ${total === 1 ? 'piece' : 'pieces'}`;
 }
 
 export function toggleSelection(selected: readonly string[], id: string): string[] {
