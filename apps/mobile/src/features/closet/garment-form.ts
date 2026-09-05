@@ -35,9 +35,17 @@ export type GarmentFormState = {
   currency: string;
   tagsAttached: boolean;
   notes: string;
+  /**
+   * Carried from a tag scan (task 4.1). Not typed by hand — there is no field
+   * for it — but shown on the form so it is visible rather than hidden state,
+   * and sent on create because a barcode is a DECISIVE duplicate signal (§2)
+   * and what product matching will key on later.
+   */
+  barcode: string | null;
 };
 
 export const EMPTY_FORM: GarmentFormState = {
+  barcode: null,
   category: null,
   subcategory: null,
   name: '',
@@ -82,6 +90,9 @@ export type GarmentLike = {
 
 export function formFromGarment(garment: GarmentLike): GarmentFormState {
   return {
+    // Editing never carries the barcode: `toUpdatePayload` does not send it,
+    // and a value the edit form holds but cannot change is a trap.
+    barcode: null,
     category: garment.category,
     subcategory: garment.subcategory,
     name: garment.name ?? '',
@@ -201,6 +212,7 @@ export function toCreatePayload(state: GarmentFormState): GarmentPayload {
     currency: price === null ? null : state.currency,
     tags_attached: state.tagsAttached ? true : null,
     notes: orNull(state.notes),
+    ...(state.barcode ? { barcode: state.barcode } : {}),
     source_type: 'manual',
   };
 }

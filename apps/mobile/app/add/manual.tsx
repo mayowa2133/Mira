@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { color } from '@mira/ui';
 import { ScreenHeader } from '@/ui/ScreenHeader';
 import { GarmentForm } from '@/features/closet/GarmentForm';
@@ -11,7 +11,7 @@ import {
   type DuplicateCandidate,
   type DuplicateRelation,
 } from '@/features/closet/duplicate-sheet';
-import { toCreatePayload, type GarmentFormState } from '@/features/closet/garment-form';
+import { EMPTY_FORM, toCreatePayload, type GarmentFormState } from '@/features/closet/garment-form';
 import { useCheckDuplicate, useCreateGarment } from '@/features/closet/queries';
 
 /**
@@ -29,6 +29,14 @@ import { useCheckDuplicate, useCreateGarment } from '@/features/closet/queries';
 export default function ManualAddScreen() {
   const router = useRouter();
   const create = useCreateGarment();
+
+  // Carried from the tag scanner (task 4.1). A barcode is worth keeping even
+  // when Mira could not read the rest of the label: it is a decisive duplicate
+  // signal and what product matching will key on.
+  const params = useLocalSearchParams<{ barcode?: string }>();
+  const initial: GarmentFormState | undefined = params.barcode
+    ? { ...EMPTY_FORM, barcode: params.barcode }
+    : undefined;
   const check = useCheckDuplicate();
 
   // The draft is held while the question is asked, so answering it does not
@@ -101,7 +109,12 @@ export default function ManualAddScreen() {
         busy={create.isPending || check.isPending}
         error={create.error}
         onSubmit={handleSubmit}
-        subtitle="Only the category is required — Mira fills in the rest as it learns."
+        {...(initial ? { initial } : {})}
+        subtitle={
+          params.barcode
+            ? `Barcode ${params.barcode} — only the category is required.`
+            : 'Only the category is required — Mira fills in the rest as it learns.'
+        }
       />
 
       <DuplicateSheet

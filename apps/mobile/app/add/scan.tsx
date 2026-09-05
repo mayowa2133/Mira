@@ -196,11 +196,7 @@ export default function ScanScreen() {
           accessibilityLabel="Take photo"
           accessibilityState={{ disabled: busy }}
         >
-          {busy ? (
-            <ActivityIndicator color={color.text} />
-          ) : (
-            <View style={styles.shutterInner} />
-          )}
+          {busy ? <ActivityIndicator color={color.text} /> : <View style={styles.shutterInner} />}
         </Pressable>
 
         <Pressable

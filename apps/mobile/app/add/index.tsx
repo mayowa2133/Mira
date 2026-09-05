@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, space, type } from '@mira/ui';
@@ -13,11 +13,18 @@ import { color, radius, space, type } from '@mira/ui';
  * 4, email in Phase 8. Options that cannot work yet say so rather than
  * dead-ending.
  */
-const OPTIONS = [
-  { icon: '🏷', label: 'Scan a tag', phase: 'Phase 4' },
-  { icon: '🧾', label: 'Scan a receipt', phase: 'Phase 4' },
-  { icon: '✉️', label: 'Find online purchases', phase: 'Phase 8' },
-  { icon: '🔗', label: 'Paste product link', phase: 'Phase 3' },
+/**
+ * The other ways in.
+ *
+ * `to` is set once a route exists; `phase` names what is still coming. A row
+ * that opens nothing and explains nothing reads as broken (CAP-4).
+ */
+const OPTIONS: { icon: string; label: string; phase: string | null; to: string | null }[] = [
+  { icon: '🏷', label: 'Scan a tag', phase: null, to: '/add/tag' },
+  { icon: '🧾', label: 'Scan a receipt', phase: null, to: '/add/receipt' },
+  // The review screen exists; what fills it does not, and it says so.
+  { icon: '✉️', label: 'Review purchases', phase: null, to: '/purchases' },
+  { icon: '🔗', label: 'Paste product link', phase: 'Phase 3', to: null },
 ];
 
 export default function AddScreen() {
@@ -58,11 +65,21 @@ export default function AddScreen() {
       </Pressable>
 
       {OPTIONS.map((option) => (
-        <View key={option.label} style={styles.row}>
+        <Pressable
+          key={option.label}
+          style={styles.row}
+          disabled={!option.to}
+          onPress={() => option.to && router.push(option.to as never)}
+          accessibilityRole="button"
+          accessibilityLabel={option.phase ? `${option.label}, ${option.phase}` : option.label}
+          testID={`add-${option.label.split(' ')[0]?.toLowerCase()}`}
+        >
           <Text style={styles.rowIcon}>{option.icon}</Text>
-          <Text style={styles.rowLabel}>{option.label}</Text>
-          <Text style={styles.rowPending}>{option.phase}</Text>
-        </View>
+          <Text style={[styles.rowLabel, !option.to && styles.rowLabelPending]}>
+            {option.label}
+          </Text>
+          <Text style={styles.rowPending}>{option.phase ?? '›'}</Text>
+        </Pressable>
       ))}
 
       {/* Manual entry is always LAST in the hierarchy: every option above it
@@ -122,6 +139,7 @@ const styles = StyleSheet.create({
   },
   rowIcon: { width: space.xxxl, fontSize: 18 },
   rowLabel: { flex: 1, fontSize: type.body.fontSize, color: color.text },
+  rowLabelPending: { color: color.textSecondary },
   rowPending: { fontSize: type.caption.fontSize, color: color.textTertiary },
   rowChevron: { fontSize: 20, color: color.textSecondary },
 });
