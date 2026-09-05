@@ -319,9 +319,52 @@ than looking finished:
 - **1.x** — the 60 fps claim rests on a duration metric, not a frame rate.
 - **4.8** — duplicate recall is 0.88 against a 0.90 target (D-029).
 - **0.5** — "sign in on a device" is impossible today.
-- **10.2** — the biometric gate typechecks and its logic is tested, but
-  `expo-local-authentication` is a native dependency and it has not been run on
-  the simulator.
+- **10.2** — partly closed 2026-09-05. `expo-local-authentication` is linked and
+  the app launches; the Face ID gate itself has still not been exercised on a
+  device, because nothing can navigate to the body profile without a session.
+
+## The design pass — 2026-09-05
+
+Not a numbered task. It came out of the question "is it too plain?", and the
+honest answer was that the app was not plain, it was **unfinished in specific
+places** — so those were finished. See D-035, D-036.
+
+What was found by looking rather than by reading:
+
+- **The app did not launch at all.** `expo-local-authentication` was in
+  `package.json` but never linked, and expo-router eagerly loads every route
+  file at startup, so one screen's module-scope import took down the whole app.
+  Structural lesson worth keeping: a missing native module in ANY route is a
+  total failure, not a broken screen.
+- **Five placeholder tab icons**, documented as "replaced in Phase 1", still
+  there on every screen in the app.
+- **Emoji standing in for icons** on onboarding and the Add sheet — the first
+  screens a new user sees.
+- **"Phase 8" and "Q-08"** rendered in the You screen.
+- **No typeface at all.** No `assets/fonts`, no `fontFamily` anywhere.
+
+Two of the six items on my own list were WRONG, checked against the specs, and
+corrected rather than built: "237 pieces" is `screen-specs.md` §14 verbatim, and
+a count inside a sentence is explicitly permitted by §13. The garment tile was
+already full-bleed; the grey read as card chrome was the seed artwork's own
+ground.
+
+Two changes would have failed **silently** and are the ones worth remembering:
+
+- `fontWeight` selects nothing on iOS once `fontFamily` names a custom face, so
+  every heading would have rendered as body copy with no error and no failing
+  test. Resolved centrally in `src/ui/Text.tsx`, enforced by
+  `no-restricted-imports`.
+- `colorDark` spreads `...color`, so an ink accent would have painted a
+  near-black selected chip onto a near-black ground.
+
+Seed imagery was rebuilt in the same pass — shaded rather than flat-filled, with
+a contact shadow and per-garment variation, still drawn and still deterministic
+(`seed-data.md`). Stock photography was considered and declined: it would cost
+the determinism `seed-data.md` buys deliberately, and both sources need an API
+key. Two seed NAME bugs surfaced once the images stopped being the worst thing
+on the tile — `other` used as a product noun, and near-duplicates named by
+appending a word.
 
 ## Known flakes
 
