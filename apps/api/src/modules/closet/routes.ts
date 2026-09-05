@@ -341,6 +341,17 @@ export async function registerClosetRoutes(
     return reply.status(204).send();
   });
 
+  /**
+   * Acknowledge a garment Mira added on its own (F-05).
+   *
+   * The closet flags auto-imports until this is called. It clears on being
+   * seen, not on the undo window expiring.
+   */
+  app.post('/garments/:id/acknowledge', { onRequest: requireAuth }, async (request) => {
+    const { id } = request.params as { id: string };
+    return service.acknowledgeAutoImport(requireScope(request), id);
+  });
+
   app.post('/garments/:id/restore', { onRequest: requireAuth }, async (request) => {
     const { id } = request.params as { id: string };
     return service.restore(requireScope(request), id);

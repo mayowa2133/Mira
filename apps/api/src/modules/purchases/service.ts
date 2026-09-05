@@ -11,7 +11,14 @@ import type { UserScope } from '../../db/scope.js';
 import { ApiError, ErrorCode, notFound, validationFailed } from '../../http/errors.js';
 import type { ClosetService } from '../closet/service.js';
 import type { IdentityRepository } from '../identity/repository.js';
-import { CREATES_GARMENT, REVIEWABLE, canTransition } from './rules.js';
+import {
+  CREATES_GARMENT,
+  REVIEWABLE,
+  canTransition,
+  canUndoAutoImport,
+  shouldAutoImport,
+} from './rules.js';
+import type { NotificationRepository } from '../notifications/routes.js';
 import type { CandidateRow, PurchaseRepository } from './repository.js';
 
 export type SerializedCandidate = ReturnType<typeof serialize>;
@@ -47,7 +54,106 @@ export class PurchaseService {
     private readonly repo: PurchaseRepository,
     private readonly closet: ClosetService,
     private readonly identity: IdentityRepository,
+    private readonly notifications: NotificationRepository,
   ) {}
+
+  /**
+   * Import high-confidence candidates without asking (F-05).
+   *
+   * Only when the user opted in, only above `AUTO_IMPORT_CONFIDENCE`, and never
+   * for a possible duplicate — `shouldAutoImport` holds those conditions and is
+   * tested on its own.
+   *
+   * **The user is still notified.** That is not a courtesy: it is the only
+   * thing separating auto-import from garments silently appearing, and F-05
+   * lists it alongside the undo window for that reason.
+   *
+   * Returns what it imported, so a scan can report honestly.
+   */
+  async autoImport(scope: UserScope, candidateIds: string[]): Promise<SerializedCandidate[]> {
+    const user = await this.identity.findById(scope.userId);
+    const enabled = user?.auto_import_enabled ?? false;
+
+    const imported: SerializedCandidate[] = [];
+    for (const id of candidateIds) {
+      const row = await this.repo.findById(scope, id);
+      if (!row) continue;
+
+      const eligible = shouldAutoImport({
+        enabled,
+        status: row.status as PurchaseCandidateStatus,
+        matchConfidence:
+          row.matched_product_confidence === null ? null : Number(row.matched_product_confidence),
+        productName: row.product_name,
+        // Duplicate detection runs inside `createGarmentFrom`; a candidate that
+        // would raise 409 there must not be imported silently, so anything
+        // Mira already linked is treated as ambiguous.
+        possibleDuplicateOf: row.linked_garment_id,
+      });
+      if (!eligible) continue;
+
+      try {
+        const garmentId = await this.createGarmentFrom(scope, row, { auto: true });
+        const updated = await this.repo.setStatus(scope, id, CREATES_GARMENT, garmentId);
+        if (!updated) continue;
+
+        await this.repo.recordPurchase(scope, { candidateId: id, garmentId, candidate: row });
+
+        // Names the piece and where it came from, and nothing else. A body
+        // carrying the price would put a purchase on a lock screen.
+        await this.notifications.create(scope, {
+          kind: 'purchase_detected',
+          title: 'Added to your closet',
+          body: `${row.product_name ?? row.raw_item_name}${row.retailer ? ` from ${row.retailer}` : ''}`,
+          entityType: 'garment',
+          entityId: garmentId,
+        });
+
+        imported.push(serialize(updated));
+      } catch {
+        // A duplicate or a failed create leaves the candidate reviewable, which
+        // is the right outcome: it becomes a question rather than a silent
+        // garment or a lost purchase.
+        continue;
+      }
+    }
+
+    return imported;
+  }
+
+  /**
+   * Undo an auto-import (F-05: "undoable for at least 30 days").
+   *
+   * Removes the garment and returns the candidate to review — not to
+   * `removed`. Mira added this without being asked; undoing it restores the
+   * question, it does not answer it on the user's behalf.
+   */
+  async undoAutoImport(scope: UserScope, candidateId: string) {
+    const row = await this.repo.findById(scope, candidateId);
+    if (!row) throw notFound(ErrorCode.candidateNotFound);
+    if (!row.linked_garment_id) {
+      throw new ApiError(422, ErrorCode.invalidStatusTransition, {
+        details: [{ field: 'status', issue: 'nothing was imported for this purchase' }],
+      });
+    }
+
+    const garment = await this.closet.getAutoImportProvenance(scope, row.linked_garment_id);
+    if (!garment?.auto_imported_at) {
+      throw new ApiError(422, ErrorCode.invalidStatusTransition, {
+        details: [{ field: 'status', issue: 'this was added by you, not automatically' }],
+      });
+    }
+    if (!canUndoAutoImport(garment.auto_imported_at)) {
+      throw new ApiError(422, ErrorCode.invalidStatusTransition, {
+        details: [{ field: 'status', issue: 'the undo window for this import has passed' }],
+      });
+    }
+
+    await this.closet.remove(scope, row.linked_garment_id);
+    const updated = await this.repo.setStatus(scope, candidateId, 'needs_review', null);
+    if (!updated) throw notFound(ErrorCode.candidateNotFound);
+    return serialize(updated);
+  }
 
   async list(scope: UserScope, params: { status?: string[]; retailer?: string[]; limit: number }) {
     for (const status of params.status ?? []) {
@@ -129,7 +235,11 @@ export class PurchaseService {
    * category Mira files it under, and `other` is a real taxonomy member rather
    * than an invented sentinel (D-019). Analysis replaces it.
    */
-  private async createGarmentFrom(scope: UserScope, row: CandidateRow): Promise<string> {
+  private async createGarmentFrom(
+    scope: UserScope,
+    row: CandidateRow,
+    options: { auto?: boolean } = {},
+  ): Promise<string> {
     const closet =
       (await this.identity.findDefaultCloset(scope)) ??
       (await this.identity.createDefaultCloset(scope));
@@ -177,6 +287,7 @@ export class PurchaseService {
       null,
     );
 
+    if (options.auto) await this.closet.markAutoImported(scope, garment.id);
     return garment.id;
   }
 }

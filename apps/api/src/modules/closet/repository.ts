@@ -368,6 +368,44 @@ export class GarmentRepository {
     );
   }
 
+  async markAutoImported(scope: UserScope, id: string): Promise<void> {
+    await scopedQuery(
+      this.db,
+      scope,
+      `update garments set auto_imported_at = now() where user_id = $1 and id = $2`,
+      [scope.userId, id],
+    );
+  }
+
+  async acknowledgeAutoImport(scope: UserScope, id: string): Promise<{ id: string } | null> {
+    const { rows } = await scopedQuery<{ id: string }>(
+      this.db,
+      scope,
+      `update garments set auto_import_acknowledged_at = now()
+        where user_id = $1 and id = $2 and auto_imported_at is not null
+        returning id`,
+      [scope.userId, id],
+    );
+    return rows[0] ?? null;
+  }
+
+  async autoImportProvenance(
+    scope: UserScope,
+    id: string,
+  ): Promise<{ auto_imported_at: Date | null; auto_import_acknowledged_at: Date | null } | null> {
+    const { rows } = await scopedQuery<{
+      auto_imported_at: Date | null;
+      auto_import_acknowledged_at: Date | null;
+    }>(
+      this.db,
+      scope,
+      `select auto_imported_at, auto_import_acknowledged_at
+         from garments where user_id = $1 and id = $2`,
+      [scope.userId, id],
+    );
+    return rows[0] ?? null;
+  }
+
   async imagesFor(scope: UserScope, garmentIds: string[]): Promise<GarmentImageRow[]> {
     if (garmentIds.length === 0) return [];
     const { rows } = await scopedQuery<GarmentImageRow>(

@@ -30,6 +30,10 @@ import { OutfitService } from '../modules/outfits/service.js';
 import { registerWardrobeRoutes } from '../modules/wardrobe/routes.js';
 import { registerPreferenceRoutes } from '../modules/preferences/routes.js';
 import { registerPurchaseRoutes } from '../modules/purchases/routes.js';
+import {
+  registerNotificationRoutes,
+  NotificationRepository,
+} from '../modules/notifications/routes.js';
 import { PurchaseRepository } from '../modules/purchases/repository.js';
 import { PurchaseService } from '../modules/purchases/service.js';
 import { WardrobeRepository } from '../modules/wardrobe/repository.js';
@@ -252,8 +256,15 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
 
       await registerPreferenceRoutes(instance);
 
+      await registerNotificationRoutes(instance);
+
       await registerPurchaseRoutes(instance, {
-        service: new PurchaseService(new PurchaseRepository(pool), closet, identity),
+        service: new PurchaseService(
+          new PurchaseRepository(pool),
+          closet,
+          identity,
+          new NotificationRepository(pool),
+        ),
       });
 
       await registerWardrobeRoutes(instance, {

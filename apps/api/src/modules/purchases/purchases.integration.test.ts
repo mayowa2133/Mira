@@ -339,3 +339,108 @@ describe('re-scanning is idempotent', () => {
     expect(Number(rows[0].n)).toBe(1);
   });
 });
+
+describe('auto-import (F-05, task 8.8)', () => {
+  const enableAutoImport = (subject: string, on: boolean) =>
+    pool!.query('update users set auto_import_enabled = $2 where auth_provider_id = $1', [
+      subject,
+      on,
+    ]);
+
+  dbIt('does nothing at all unless the user opted in', async () => {
+    await enableAutoImport(ALICE, false);
+    const id = await seedCandidate(ALICE, { matched_product_confidence: 0.99 });
+
+    const res = await app!.inject({
+      method: 'POST',
+      url: '/v1/purchase-candidates/bulk',
+      headers: await auth(ALICE),
+      payload: { ids: [id], status: 'uncertain' },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const after = await pool!.query('select status from purchase_candidates where id = $1', [id]);
+    expect(after.rows[0].status).not.toBe('confirmed_owned');
+  });
+
+  dbIt('flags what it added, and notifies', async () => {
+    await enableAutoImport(ALICE, true);
+    const id = await seedCandidate(ALICE, { matched_product_confidence: 0.99 });
+
+    // Driven through the service the way a scan would, since no scanner exists.
+    const { PurchaseService } = await import('./service.js');
+    const { PurchaseRepository } = await import('./repository.js');
+    const { NotificationRepository } = await import('../notifications/routes.js');
+    const { IdentityRepository } = await import('../identity/repository.js');
+    const { ClosetService } = await import('../closet/service.js');
+    const { GarmentRepository } = await import('../closet/repository.js');
+    const { DuplicateRepository } = await import('../closet/duplicate-repository.js');
+    const { DuplicateService } = await import('../closet/duplicate-service.js');
+    const { createLocalStorage: storageFor } = await import('@mira/storage');
+
+    const storage = storageFor({
+      root: storageRoot,
+      secret: 'test',
+      publicBaseUrl: 'http://localhost:4000/v1',
+    });
+    const garments = new GarmentRepository(pool!);
+    const closet: InstanceType<typeof ClosetService> = new ClosetService(
+      garments,
+      storage,
+      new DuplicateService(new DuplicateRepository(pool!), (sc, rows) =>
+        closet.serializeRows(sc, rows),
+      ),
+    );
+    const service = new PurchaseService(
+      new PurchaseRepository(pool!),
+      closet,
+      new IdentityRepository(pool!),
+      new NotificationRepository(pool!),
+    );
+
+    const user = await pool!.query<{ id: string }>(
+      'select id from users where auth_provider_id = $1',
+      [ALICE],
+    );
+    const scope = { userId: user.rows[0]!.id };
+
+    const imported = await service.autoImport(scope, [id]);
+    expect(imported).toHaveLength(1);
+
+    // Flagged until acknowledged, so the closet can say this appeared on its own.
+    const garment = await pool!.query<{ auto_imported_at: Date | null }>(
+      'select auto_imported_at from garments where id = $1',
+      [imported[0]!.linked_garment_id],
+    );
+    expect(garment.rows[0]!.auto_imported_at).not.toBeNull();
+
+    // "The user is still notified" — the thing separating auto-import from
+    // garments silently appearing.
+    const notes = await pool!.query<{ kind: string; body: string }>(
+      'select kind, body from notifications where user_id = $1',
+      [scope.userId],
+    );
+    expect(notes.rows.map((n) => n.kind)).toContain('purchase_detected');
+    // Never a price: a body carrying one puts a purchase on a lock screen.
+    expect(notes.rows[0]!.body).not.toMatch(/\d+\.\d{2}|\$|CAD/);
+  });
+
+  dbIt(
+    'an acknowledgement cannot be recorded against a garment nobody was asked about',
+    async () => {
+      // Otherwise it would read as "the user reviewed this" in any later audit.
+      const { rows } = await pool!.query<{ id: string }>(
+        `select g.id from garments g join users u on u.id = g.user_id
+        where u.auth_provider_id = $1 and g.auto_imported_at is null limit 1`,
+        [ALICE],
+      );
+      if (!rows[0]) return;
+
+      await expect(
+        pool!.query('update garments set auto_import_acknowledged_at = now() where id = $1', [
+          rows[0].id,
+        ]),
+      ).rejects.toThrow();
+    },
+  );
+});

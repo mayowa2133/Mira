@@ -57,6 +57,18 @@ export async function registerPurchaseRoutes(
   });
 
   /**
+   * Undo an auto-import (F-05).
+   *
+   * Returns the candidate to review rather than dismissing it: Mira added this
+   * without being asked, so undoing restores the question rather than answering
+   * it on the user's behalf.
+   */
+  app.post('/purchase-candidates/:id/undo-import', { onRequest: requireAuth }, async (request) => {
+    const { id } = request.params as { id: string };
+    return service.undoAutoImport(requireScope(request), id);
+  });
+
+  /**
    * Bulk status change — "everything from this retailer" (A-03).
    *
    * Applied one at a time rather than in a single statement, because each

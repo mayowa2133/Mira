@@ -658,6 +658,27 @@ export class ClosetService {
     return this.get(scope, id);
   }
 
+  /**
+   * Mark a garment as having appeared without anyone asking (F-05).
+   *
+   * The closet flags these until acknowledged, and the flag clears on
+   * acknowledgement rather than on the undo window expiring — the point is
+   * that the user has SEEN it, not that time has passed.
+   */
+  async markAutoImported(scope: UserScope, id: string): Promise<void> {
+    await this.repo.markAutoImported(scope, id);
+  }
+
+  async acknowledgeAutoImport(scope: UserScope, id: string) {
+    const row = await this.repo.acknowledgeAutoImport(scope, id);
+    if (!row) throw notFound(ErrorCode.garmentNotFound);
+    return this.get(scope, id);
+  }
+
+  async getAutoImportProvenance(scope: UserScope, id: string) {
+    return this.repo.autoImportProvenance(scope, id);
+  }
+
   async remove(scope: UserScope, id: string): Promise<void> {
     const removed = await this.repo.softDelete(scope, id);
     if (!removed) throw notFound(ErrorCode.garmentNotFound);
